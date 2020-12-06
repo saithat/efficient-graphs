@@ -18,12 +18,12 @@ from s2v_lib import S2VLIB
 from pytorch_util import weights_init
 
 class S2VGraph(object):
-    def __init__(self, g, label, node_tags=None):        
+    def __init__(self, g, label=None, node_tags=None):        
         self.num_nodes = len(g)
         self.node_tags = node_tags
         x, y = zip(*g.edges())
         self.num_edges = len(x)
-        self.label = label
+        #self.label = label
         
         self.edge_pairs = np.ndarray(shape=(self.num_edges, 2), dtype=np.int32)
         self.edge_pairs[:, 0] = x

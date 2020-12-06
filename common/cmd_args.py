@@ -1,5 +1,5 @@
 import argparse
-import cPickle as cp
+import pickle as cp
 
 cmd_opt = argparse.ArgumentParser(description='Argparser for molecule vae')
 cmd_opt.add_argument('-data_folder', type=str, default=None, help='data folder')

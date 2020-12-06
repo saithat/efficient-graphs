@@ -13,7 +13,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 from tqdm import tqdm
 
-sys.path.append('%s/../../pytorch_structure2vec/s2v_lib' % os.path.dirname(os.path.realpath(__file__)))
+sys.path.append('%s/../pytorch_structure2vec/s2v_lib' % os.path.dirname(os.path.realpath(__file__)))
 from pytorch_util import weights_init
 
 sys.path.append('%s/../common' % os.path.dirname(os.path.realpath(__file__)))

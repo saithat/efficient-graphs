@@ -73,9 +73,13 @@ class MLPClassifier(nn.Module):
             return logits
 
 class GraphClassifier(nn.Module):
-    def __init__(self, label_map, **kwargs):
+    def __init__(self, label_map=None, num_classes=None, **kwargs):
         super(GraphClassifier, self).__init__()
-        self.label_map = label_map
+        #self.label_map = label_map
+        if num_classes is not None:
+            self.num_classes = num_classes
+        else:
+            self.num_classes = 20
         if kwargs['gm'] == 'mean_field':
             model = EmbedMeanField
         elif kwargs['gm'] == 'loopy_bp':
@@ -95,8 +99,8 @@ class GraphClassifier(nn.Module):
         out_dim = kwargs['out_dim']
         if out_dim == 0:
             out_dim = kwargs['latent_dim']
-        self.mlp = MLPClassifier(input_size=out_dim, hidden_size=kwargs['hidden'], num_class=len(label_map))
-
+        self.mlp = MLPClassifier(input_size=out_dim, hidden_size=kwargs['hidden'], num_class=self.num_classes)
+"""
     def PrepareFeatureLabel(self, batch_graph):
         labels = torch.LongTensor(len(batch_graph))
         n_nodes = 0
@@ -115,7 +119,7 @@ class GraphClassifier(nn.Module):
         if cmd_args.ctx == 'gpu':
             node_feat = node_feat.cuda()
         return node_feat, None, labels
-
+"""
     def forward(self, batch_graph): 
         node_feat, edge_feat, labels = self.PrepareFeatureLabel(batch_graph)
         if cmd_args.ctx == 'gpu':

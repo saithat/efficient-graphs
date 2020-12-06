@@ -24,6 +24,8 @@ from nstep_replay_mem import NstepReplayMem
 sys.path.append('%s/../graph_classification' % os.path.dirname(os.path.realpath(__file__)))
 from graph_common import loop_dataset
 
+from message import Generate_dataset
+
 class Agent(object):
     def __init__(self, g_list, test_g_list, env):
         self.g_list = g_list
@@ -163,16 +165,23 @@ class Agent(object):
             pbar.set_description('exp: %.5f, loss: %0.5f' % (self.eps, loss) )
 
         log_out.close()
+
+
 if __name__ == '__main__':
-    random.seed(cmd_args.seed)
-    np.random.seed(cmd_args.seed)
-    torch.manual_seed(cmd_args.seed)
+    #random.seed(cmd_args.seed)
+    #np.random.seed(cmd_args.seed)
+    #torch.manual_seed(cmd_args.seed)
 
     #label_map, _, g_list = load_graphs()
+    n_graphs = 5
+    output = Generate_dataset(n_graphs)
+    train_list, test_list = load_graphs(output, n_graphs)
     # get list of graphs
 
-    random.shuffle(g_list)
-    base_classifier = load_base_model(label_map, g_list)
+    #random.shuffle(g_list)
+    #base_classifier = load_base_model(label_map, g_list)
+    base_args = {'gm': 'mean_field', 'feat_dim': 2, 'latent_dim': 10, 'output_dim': 20, 'max_lv':5, }
+    base_classifier = GraphClassifier(num_classes=20, **vars(base_args))
     env = GraphEdgeEnv(base_classifier, n_edges = 1)
     
     if cmd_args.frac_meta > 0:

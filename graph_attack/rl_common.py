@@ -147,7 +147,7 @@ class GraphEdgeEnv(object):
             b_list = self.banned_list[:]
 
         return zip(deepcopy(self.g_list), cp_first, b_list)
-
+"""
 def load_graphs():
     frac_train = 0.9
     pattern = 'nrange-%d-%d-n_graph-%d-p-%.2f' % (cmd_args.min_n, cmd_args.max_n, cmd_args.n_graphs, cmd_args.er_p)
@@ -167,6 +167,20 @@ def load_graphs():
     print('# train:', len(train_glist), ' # test:', len(test_glist))
 
     return label_map, train_glist, test_glist
+"""
+def load_graph(graph_tuples, n_graphs, frac_train=None):
+    train_glist = []
+    test_glist = []
+    if (frac_train is not None):
+        frac_train = frac_train
+    else:
+        frac_train = 0.8
+    num_train = int(frac_train * n_graphs)
+    train_glist += [S2VGraph(graph_tuples[0]) for j in range(num_train)]
+    test_glist += [S2VGraph(graph_tuples[0]) for j in range(num_train, n_graphs)]
+    print('# train:', len(train_glist), ' # test:', len(test_glist))
+
+    return train_glist, test_glist
 
 def test_graphs(classifier, test_glist):
     test_loss = loop_dataset(test_glist, classifier, list(range(len(test_glist))))
