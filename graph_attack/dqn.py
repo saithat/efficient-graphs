@@ -18,7 +18,7 @@ from q_net import QNet, greedy_actions
 sys.path.append('%s/../common' % os.path.dirname(os.path.realpath(__file__)))
 from cmd_args import cmd_args
 
-from rl_common import GraphEdgeEnv, local_args, load_graphs, test_graphs, load_base_model, attackable, get_supervision
+from rl_common import GraphEdgeEnv, local_args, load_graphs, test_graphs, load_base_model
 from nstep_replay_mem import NstepReplayMem
 
 sys.path.append('%s/../graph_classification' % os.path.dirname(os.path.realpath(__file__)))

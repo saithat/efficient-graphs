@@ -168,7 +168,7 @@ def load_graphs():
 
     return label_map, train_glist, test_glist
 """
-def load_graph(graph_tuples, n_graphs, frac_train=None):
+def load_graphs(graph_tuples, n_graphs, frac_train=None):
     train_glist = []
     test_glist = []
     if (frac_train is not None):

@@ -7,7 +7,7 @@ import math
 import time
 
 def genRandomGraphX2(num_nodes, num_edges):
-    num_nodes -= 1 # the graph is zero-indexed but the total number at the end isn't?!
+    #num_nodes -= 1 # the graph is zero-indexed but the total number at the end isn't?!
     G = nx.cycle_graph(num_nodes)
 
     # random edges:
@@ -82,5 +82,5 @@ def Generate_dataset(N):
         
         out.append([G, X, Y])
 
-    return np.array(out)
+    return out
     

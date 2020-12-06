@@ -21,6 +21,7 @@ from graph_embedding import EmbedMeanField, EmbedLoopyBP
 from cmd_args import cmd_args
 from modules.custom_mod import JaggedMaxModule
 
+
 from rl_common import local_args
 
 def greedy_actions(q_values, v_p, banned_list):
