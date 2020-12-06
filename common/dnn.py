@@ -100,6 +100,16 @@ class GraphClassifier(nn.Module):
         if out_dim == 0:
             out_dim = kwargs['latent_dim']
         self.mlp = MLPClassifier(input_size=out_dim, hidden_size=kwargs['hidden'], num_class=self.num_classes)
+
+    def forward(self, batch_graph): 
+        node_feat, edge_feat, labels = self.PrepareFeatureLabel(batch_graph)
+        if cmd_args.ctx == 'gpu':
+            node_feat = node_feat.cuda()
+            labels = labels.cuda()
+            
+        _, embed = self.s2v(batch_graph, node_feat, edge_feat, pool_global=True)
+
+        return self.mlp(embed, labels)
 """
     def PrepareFeatureLabel(self, batch_graph):
         labels = torch.LongTensor(len(batch_graph))
@@ -120,12 +130,3 @@ class GraphClassifier(nn.Module):
             node_feat = node_feat.cuda()
         return node_feat, None, labels
 """
-    def forward(self, batch_graph): 
-        node_feat, edge_feat, labels = self.PrepareFeatureLabel(batch_graph)
-        if cmd_args.ctx == 'gpu':
-            node_feat = node_feat.cuda()
-            labels = labels.cuda()
-            
-        _, embed = self.s2v(batch_graph, node_feat, edge_feat, pool_global=True)
-
-        return self.mlp(embed, labels)
