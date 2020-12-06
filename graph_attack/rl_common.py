@@ -186,7 +186,7 @@ def load_base_model(label_map, test_glist = None):
         test_graphs(classifier, test_glist)
 
     return classifier
-
+"""
 def attackable(classifier, s2v_g, x = None, y = None):
     g = s2v_g.to_networkx()
     comps = [c for c in nx.connected_component_subgraphs(g)]
@@ -242,3 +242,4 @@ def get_supervision(classifier, list_st, list_at):
             list_target[i] = -1.0
     
     return list_target
+"""

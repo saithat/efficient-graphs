@@ -155,6 +155,7 @@ class QNet(nn.Module):
             
         return actions, raw_pred, prefix_sum
 
+"""
 class NStepQNet(nn.Module):
     def __init__(self, num_steps, s2v_module = None):
         super(NStepQNet, self).__init__()
@@ -172,3 +173,4 @@ class NStepQNet(nn.Module):
         assert time_t >= 0 and time_t < self.num_steps
 
         return self.list_mod[time_t](time_t, states, actions, greedy_acts)
+"""

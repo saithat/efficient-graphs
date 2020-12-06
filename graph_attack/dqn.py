@@ -14,7 +14,7 @@ import torch.optim as optim
 from tqdm import tqdm
 from copy import deepcopy
 
-from q_net import NStepQNet, QNet, greedy_actions
+from q_net import QNet, greedy_actions
 sys.path.append('%s/../common' % os.path.dirname(os.path.realpath(__file__)))
 from cmd_args import cmd_args
 
@@ -33,16 +33,17 @@ class Agent(object):
             self.test_g_list = test_g_list
         self.mem_pool = NstepReplayMem(memory_size=50000, n_steps=2)
         self.env = env
-        # self.net = QNet()
-        self.net = NStepQNet(2)
-        self.old_net = NStepQNet(2)
+        self.net = QNet()
+        self.old_net = QNet()
+        #self.net = NStepQNet(2)
+        #self.old_net = NStepQNet(2)
         if cmd_args.ctx == 'gpu':
             self.net = self.net.cuda()
             self.old_net = self.old_net.cuda()
         self.eps_start = 1.0
         self.eps_end = 1.0
         self.eps_step = 10000
-        self.burn_in = 100
+        self.burn_in = 100              # number of iterations to run first set ("intial burning in to memeory") of simulations?
         self.step = 0
 
         self.best_eval = None
@@ -119,7 +120,7 @@ class Agent(object):
         pbar = tqdm(range(self.burn_in), unit='batch')
         for p in pbar:
             self.run_simulation()
-        pbar = tqdm(range(local_args.num_steps), unit='steps')
+        pbar = tqdm(range(local_args.num_steps), unit='steps')      # number of iterations to train?
         optimizer = optim.Adam(self.net.parameters(), lr=cmd_args.learning_rate)
         for self.step in pbar:
 
@@ -167,7 +168,9 @@ if __name__ == '__main__':
     np.random.seed(cmd_args.seed)
     torch.manual_seed(cmd_args.seed)
 
-    label_map, _, g_list = load_graphs()
+    #label_map, _, g_list = load_graphs()
+    # get list of graphs
+
     random.shuffle(g_list)
     base_classifier = load_base_model(label_map, g_list)
     env = GraphEdgeEnv(base_classifier, n_edges = 1)
