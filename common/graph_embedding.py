@@ -23,7 +23,9 @@ class S2VGraph(object):
         self.node_tags = node_tags
         x, y = zip(*g.edges())
         self.num_edges = len(x)
-        #self.label = label
+        self.label = label
+        
+        (graph, stub, Y)
         
         self.edge_pairs = np.ndarray(shape=(self.num_edges, 2), dtype=np.int32)
         self.edge_pairs[:, 0] = x

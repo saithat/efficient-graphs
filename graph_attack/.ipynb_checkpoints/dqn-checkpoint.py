@@ -122,24 +122,44 @@ class Agent(object):
 
     def train(self):
         log_out = open(cmd_args.logfile, 'w', 0)
+        
+        # set up progress bar
         pbar = tqdm(range(self.burn_in), unit='batch')
+        
+        # maybe warm up?
         for p in pbar:
             self.run_simulation()
+        
+        # set up real progress bar
         pbar = tqdm(range(local_args.num_steps), unit='steps')      # number of iterations to train?
+        
+        # set optimizer
         optimizer = optim.Adam(self.net.parameters(), lr=cmd_args.learning_rate)
+        
+        # for each iteration
         for self.step in pbar:
 
+            # run simulation
+            # side effects?
             self.run_simulation()
 
+            # save weights and evalute
             if self.step % 100 == 0:
                 self.take_snapshot()
             if self.step % 100 == 0:
                 r, acc = self.eval()
                 log_out.write('%d %.6f %.6f\n' % (self.step, r, acc))
 
+            #
+            # memory replay sample? figure out later
+            # 
+            
+            # list_st = states, list_at = actions
             cur_time, list_st, list_at, list_rt, list_s_primes, list_term = self.mem_pool.sample(batch_size=cmd_args.batch_size)
 
+            
             list_target = torch.Tensor(list_rt)
+            
             if cmd_args.ctx == 'gpu':
                 list_target = list_target.cuda()
 
@@ -159,6 +179,7 @@ class Agent(object):
             # list_target = get_supervision(self.env.classifier, list_st, list_at)
             list_target = Variable(list_target.view(-1, 1))
 
+            # q_sa = raw_pred
             _, q_sa, _ = self.net(cur_time, list_st, list_at)
 
             loss = F.mse_loss(q_sa, list_target)

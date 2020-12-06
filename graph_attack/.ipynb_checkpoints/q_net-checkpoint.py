@@ -175,9 +175,3 @@ class NStepQNet(nn.Module):
 
         return self.list_mod[time_t](time_t, states, actions, greedy_acts)
 """
-
-def a:
-    asdf
-    
-
-a(4)
