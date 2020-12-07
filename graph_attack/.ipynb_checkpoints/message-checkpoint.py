@@ -13,7 +13,7 @@ def genRandomGraphX2(num_nodes, num_edges):
     # random edges:
     edges_added = 0
     while edges_added < num_edges-num_nodes:
-        u,v = random.randint(0,num_nodes), random.randint(0,num_nodes)
+        u,v = random.randint(0,num_nodes-1), random.randint(0,num_nodes-1)
         if u != v:
             if not G.has_edge(u,v):
                 G.add_edge(u,v)

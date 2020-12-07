@@ -72,10 +72,11 @@ class Agent(object):
         else:
             cur_state = self.env.getStateRef()
             
-            actions, _, _ = self.net(cur_state, None, greedy_acts=True, _type=_type)
+            actions, _ = self.net(cur_state, None, greedy_acts=True, _type=_type)
             
-            actions = list(actions.cpu().numpy())
-            
+            actions = torch.cat(actions)
+            actions = actions.numpy().tolist()
+                        
         return actions
 
     def run_simulation(self):
@@ -85,7 +86,7 @@ class Agent(object):
         t_a, t_s = 0, 0
         
         #while not env.isTerminal():
-        for asdf in range(1):
+        for asdf in range(50):
             
             if asdf % 2 == 0:
                 assert self.env.first_nodes == None
@@ -119,31 +120,14 @@ class Agent(object):
                 
             #print(list_st, list_at, rewards, s_prime, [env.isTerminal()] * len(list_at), t_a)
             
-            print("\n\nGot here\n\n")
-            
-            print("\n\nlist_st:")
-            print(list_st)
-            
-            print("\n\nlist_at:")
-            print(list_at)
-            
-            print("\n\nrewards:")
-            print(rewards)
-            
-            print("\n\ns_sprime:")
-            print(s_prime)
-            
-            print("\n\nstep_cound:")
-            print(t_a)
-            
-            
-            quit()
-                
+            print("\n\nActions:", list_at)
+            print("\n\nRewards:", rewards)
+                            
             if action_type == 0:
-                self.add_mem_pool.add_list(list_st, list_at, rewards, s_prime, [env.isTerminal()] * len(list_at), t_a)
+                self.add_mem_pool.add_list(list_st, list_at, rewards, s_prime, [env.isTerminal()] * len(list_at), t_a % 2)
                 t_a += 1
             else:
-                self.sub_mem_pool.add_list(list_st, list_at, rewards, s_prime, [env.isTerminal()] * len(list_at), t_s)
+                self.sub_mem_pool.add_list(list_st, list_at, rewards, s_prime, [env.isTerminal()] * len(list_at), t_s % 2)
                 t_s += 1
                 
     def eval(self):

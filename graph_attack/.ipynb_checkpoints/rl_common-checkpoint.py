@@ -92,7 +92,7 @@ class GraphEdgeEnv(object):
             else:
                 Y = get_y_add(g, self.first_nodes[i])
             
-            R = np.dot(actions[i], Y)
+            R = Y[actions[i]]
             
             rewards.append(R)
             
@@ -125,10 +125,6 @@ class GraphEdgeEnv(object):
                 if _type:
                     # remove edge between edge stub and action
                     
-                    print("Action is None:", actions[i] is None)
-                    print("Edge stub is None:", self.first_nodes[i] is None)
-                    print()
-                    
                     if g.has_edge(self.first_nodes[i], actions[i]):
                         g.remove_edge(self.first_nodes[i], actions[i])
 
@@ -141,9 +137,9 @@ class GraphEdgeEnv(object):
             
                 self.g_list[i] = S2VGraph(g, label = self.g_list[i].label)
              
-                # set edge stub to none
-                self.first_nodes = None
-                self.banned_list = None
+            # set edge stub to none
+            self.first_nodes = None
+            self.banned_list = None
         
         self.n_steps += 1
 

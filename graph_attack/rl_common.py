@@ -92,7 +92,7 @@ class GraphEdgeEnv(object):
             else:
                 Y = get_y_add(g, self.first_nodes[i])
             
-            R = np.dot(actions[i], Y)
+            R = Y[actions[i]]
             
             rewards.append(R)
             

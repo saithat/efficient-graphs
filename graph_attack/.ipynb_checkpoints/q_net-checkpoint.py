@@ -23,44 +23,28 @@ from cmd_args import cmd_args
 from rl_common import local_args
 
 def greedy_actions(q_values, banned_list):
-    
-    print("*********", type(q_values), "*********")
-    
-    
-    
-    
-    
-    
-
-    return actions
-
-def greedy_actions(q_values, v_p, banned_list):
-    
-    print("greedy_actions input shape:", q_values.shape)
-    
+        
     actions = []
     offset = 0
     banned_acts = []
-    prefix_sum = v_p.data.cpu().numpy()
-    for i in range(len(prefix_sum)):
-        n_nodes = prefix_sum[i] - offset
-
-        if banned_list is not None and banned_list[i] is not None:
-            for j in banned_list[i]:
-                banned_acts.append(offset + j)                    
-        offset = prefix_sum[i]
-
+    
     q_values = q_values.data.clone()
-    if len(banned_acts):
-        q_values[banned_acts, :] = np.finfo(np.float64).min
-    jmax = JaggedMaxModule()
-    values, actions = jmax(Variable(q_values), v_p)
     
-    actions = torch.argmax(q_values, dim=-1)
+    # To Do:
+    #
+    # Banned actions get minimum value
+    #
+    #
     
-    print("greedy_actions output shape:", actions.shape)
-
-    return actions.data, values.data
+    num_chunks = q_values.shape[0] // 20
+    
+    print(num_chunks)
+    
+    q_list = torch.chunk(q_values[:num_chunks * 20], num_chunks, dim=0)
+    
+    actions = [torch.argmax(q_val, dim=0) for q_val in q_list]
+    
+    return actions
     
 class QNet(nn.Module):
     def __init__(self, s2v_module = None):
@@ -79,15 +63,12 @@ class QNet(nn.Module):
             embed_dim = cmd_args.out_dim
         
         #if local_args.mlp_hidden:
-        self.add_linear_1 = nn.Linear(embed_dim * 2, local_args.mlp_hidden)
+        self.add_linear_1 = nn.Linear(embed_dim, local_args.mlp_hidden)
         self.add_linear_out = nn.Linear(local_args.mlp_hidden, 1)
         
-        self.sub_linear_1 = nn.Linear(embed_dim * 2, local_args.mlp_hidden)
+        self.sub_linear_1 = nn.Linear(embed_dim, local_args.mlp_hidden)
         self.sub_linear_out = nn.Linear(local_args.mlp_hidden, 1)
-        
-        print("Linear output shape:", local_args.mlp_hidden)
-
-        
+                
         weights_init(self)
 
         if s2v_module is None:
@@ -102,25 +83,23 @@ class QNet(nn.Module):
     # batch_graph is the graph, picked_nodes is the edge stub
     def PrepareFeatures(self, batch_graph, picked_nodes):
         
-        n_nodes = 0
-        prefix_sum = []
-        picked_ones = []
+        n_nodes = batch_graph[0].num_nodes
+        node_feat_list = []
         
         for i in range(len(batch_graph)):
             if picked_nodes is not None and picked_nodes[i] is not None:
                 assert picked_nodes[i] >= 0 and picked_nodes[i] < batch_graph[i].num_nodes
-                picked_ones.append(n_nodes + picked_nodes[i])
-            n_nodes += batch_graph[i].num_nodes
-            prefix_sum.append(n_nodes)
 
-        node_feat = torch.zeros(n_nodes, 2)
-        node_feat[:, 0] = 1.0
+            node_feat = torch.zeros(n_nodes, 2)
+            node_feat[:, 0] = 1.0
 
-        if len(picked_ones):
-            node_feat.numpy()[picked_ones, 1] = 1.0
-            node_feat.numpy()[picked_ones, 0] = 0.0
+            if len(picked_nodes) >= i:
+                node_feat.numpy()[picked_nodes[i], 1] = 1.0
+                node_feat.numpy()[picked_nodes[i], 0] = 0.0
+                
+            node_feat_list.append(node_feat)
 
-        return node_feat, torch.LongTensor(prefix_sum)
+        return node_feat_list
 
     def add_offset(self, actions, v_p):
         prefix_sum = v_p.data.cpu().numpy()
@@ -135,9 +114,7 @@ class QNet(nn.Module):
 
         return shifted
 
-    def rep_global_embed(self, graph_embed, v_p):
-        prefix_sum = v_p.data.cpu().numpy()
-
+    def rep_global_embed(self, graph_embed, prefix_sum):
         rep_idx = []        
         for i in range(len(prefix_sum)):
             if i == 0:
@@ -155,32 +132,35 @@ class QNet(nn.Module):
     # type = 0 for add, 1 for subtract
     def forward(self, states, actions, greedy_acts = False, _type=0):
         
-        print("-----------", "starting forward", "-----------")
-        
-        
         batch_graph, picked_nodes, banned_list = zip(*states)
-        
-        print("Batch graph len:", len(batch_graph))
 
-        node_feat, prefix_sum = self.PrepareFeatures(batch_graph, picked_nodes)
+        node_feat = self.PrepareFeatures(batch_graph, picked_nodes)
         
-        print("node_feat shape:", len(node_feat))
         
         if cmd_args.ctx == 'gpu':
             node_feat = node_feat.cuda()
-            prefix_sum = prefix_sum.cuda()
+
             
-        prefix_sum = Variable(prefix_sum)
-
-        embed, graph_embed = self.s2v(batch_graph, node_feat, None, pool_global=True)
-
-        if actions is None:
-            graph_embed = self.rep_global_embed(graph_embed, prefix_sum)
-        else:
-            shifted = self.add_offset(actions, prefix_sum)
-            embed = embed[shifted, :]
+        embed = []
+        graph_embed = []
         
-        embed_s_a = torch.cat((embed, graph_embed), dim=1)
+        for i in range(len(batch_graph)):
+            tmp_embed, tmp_graph_embed = self.s2v([batch_graph[i]], node_feat[i], None, pool_global=True)
+            
+            embed.append(tmp_embed)
+            graph_embed.append(tmp_graph_embed)
+                    
+        dummy = torch.zeros(80, 2)
+        
+        tmp_embed, tmp_graph_embed = self.s2v(batch_graph, dummy, None, pool_global=True)    
+        
+        #embed = torch.FloatTensor(embed)
+        #graph_embed = torch.FloatTensor(graph_embed)
+        
+        embed = torch.cat(embed)
+        graph_embed = torch.cat(graph_embed)
+
+        embed_s_a = torch.cat((embed, graph_embed), dim=0)
 
         #if local_args.mlp_hidden:
         if _type:
@@ -189,13 +169,11 @@ class QNet(nn.Module):
         else:
             embed_s_a = F.relu( self.add_linear_1(embed_s_a) )
             raw_pred = self.add_linear_out(embed_s_a)
-            
-        print("DQN output shape:", raw_pred.shape)
-        
+                    
         if greedy_acts:
-            actions = greedy_actions(raw_pred, prefix_sum, banned_list)
+            actions = greedy_actions(raw_pred, banned_list)
             
-        return actions, raw_pred, prefix_sum
+        return actions, raw_pred
 
 """
 class NStepQNet(nn.Module):
