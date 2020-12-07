@@ -118,13 +118,19 @@ class GraphEdgeEnv(object):
             
             #self.added_edges = []
 
-            for i in range(len(g_list)):
+            for i in range(len(self.g_list)):
             
                 g = self.g_list[i].to_networkx()
                
                 if _type:
                     # remove edge between edge stub and action
-                    g.remove_edge(self.first_nodes[i], actions[i])
+                    
+                    print("Action is None:", actions[i] is None)
+                    print("Edge stub is None:", self.first_nodes[i] is None)
+                    print()
+                    
+                    if g.has_edge(self.first_nodes[i], actions[i]):
+                        g.remove_edge(self.first_nodes[i], actions[i])
 
                 else:
                     # create edge between edge stub and action

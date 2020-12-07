@@ -122,6 +122,7 @@ class QNet(nn.Module):
         if cmd_args.ctx == 'gpu':
             node_feat = node_feat.cuda()
             prefix_sum = prefix_sum.cuda()
+            
         prefix_sum = Variable(prefix_sum)
 
         embed, graph_embed = self.s2v(batch_graph, node_feat, None, pool_global=True)

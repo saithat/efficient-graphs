@@ -118,13 +118,15 @@ class GraphEdgeEnv(object):
             
             #self.added_edges = []
 
-            for i in range(len(g_list)):
+            for i in range(len(self.g_list)):
             
                 g = self.g_list[i].to_networkx()
                
                 if _type:
                     # remove edge between edge stub and action
-                    g.remove_edge(self.first_nodes[i], actions[i])
+                    
+                    if g.has_edge(self.first_nodes[i], actions[i]):
+                        g.remove_edge(self.first_nodes[i], actions[i])
 
                 else:
                     # create edge between edge stub and action
@@ -135,9 +137,9 @@ class GraphEdgeEnv(object):
             
                 self.g_list[i] = S2VGraph(g, label = self.g_list[i].label)
              
-                # set edge stub to none
-                self.first_nodes = None
-                self.banned_list = None
+            # set edge stub to none
+            self.first_nodes = None
+            self.banned_list = None
         
         self.n_steps += 1
 

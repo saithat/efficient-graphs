@@ -85,62 +85,45 @@ class Agent(object):
         t_a, t_s = 0, 0
         
         #while not env.isTerminal():
-        for asdf in range(20):
+        for asdf in range(50):
             
-            # --------------- Add Action ---------------
+            if asdf % 2 == 0:
+                assert self.env.first_nodes == None
+            assert self.g_list[0].num_nodes == 20 or self.g_list[0].num_nodes == 21
             
             # generate action
-            list_at = self.make_actions(_type=0)
+            if len(self.g_list) == 20:
+                action_type = 0
+            else:
+                action_type = 1
+                
+            list_at = self.make_actions(_type=action_type)
+                        
             list_st = self.env.cloneState()
             
             # get rewards
             
             if self.env.first_nodes is not None:
-                rewards = self.env.get_rewards(list_at, _type=0)
+                rewards = self.env.get_rewards(list_at, _type=action_type)
             else:
                 rewards = [0] * len(g_list)
             
             # execute the action to update the graph
-            self.env.step(list_at, _type = 0)
+            self.env.step(list_at, _type = action_type)
             
             # get next state
             if env.isTerminal():
                 s_prime = None
             else:
                 s_prime = self.env.cloneState()
-
-            self.add_mem_pool.add_list(list_st, list_at, rewards, s_prime, [env.isTerminal()] * len(list_at), t_a)
-            
-            t_a += 1
-            
-            # --------------- Subtract Action ---------------
-            
-            # generate action
-            list_at = self.make_actions(_type=1)
-            list_st = self.env.cloneState()
-            
-            # get rewards
-            if self.env.first_nodes is not None:
-                rewards = self.env.get_rewards(list_at, _type=1)
-
+                
+            if action_type == 0:
+                self.add_mem_pool.add_list(list_st, list_at, rewards, s_prime, [env.isTerminal()] * len(list_at), t_a)
+                t_a += 1
             else:
-                rewards = [0] * len(g_list)
-            
-            # execute the action to update the graph
-            self.env.step(list_at, _type = 1)
-
-            # get next state
-            if env.isTerminal():
-                s_prime = None
-            else:
-                s_prime = self.env.cloneState()
-
-            self.sub_mem_pool.add_list(list_st, list_at, rewards, s_prime, [env.isTerminal()] * len(list_at), t_s)
-            
-            t_s += 1
-            
-            
-
+                self.sub_mem_pool.add_list(list_st, list_at, rewards, s_prime, [env.isTerminal()] * len(list_at), t_s)
+                t_s += 1
+                
     def eval(self):
         self.env.setup(deepcopy(self.test_g_list))
         t = 0
@@ -255,7 +238,7 @@ if __name__ == '__main__':
     
     #base_classifier = load_base_model(label_map, g_list)
     
-    base_args = {'gm': 'mean_field', 'feat_dim': 2, 'latent_dim': 10, 'out_dim': 20, 'max_lv': 5, 'hidden': 1}
+    base_args = {'gm': 'mean_field', 'feat_dim': 2, 'latent_dim': 10, 'out_dim': 20, 'max_lv': 2, 'hidden': 32}
     base_classifier = GraphClassifier(num_classes=20, **base_args)
     
     env = GraphEdgeEnv(base_classifier)

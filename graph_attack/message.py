@@ -21,7 +21,6 @@ def genRandomGraphX2(num_nodes, num_edges):
 
     pos = nx.kamada_kawai_layout(G)
     nx.draw(G, pos, with_labels=True, node_color=[[.7, .7, .7]])
-    print("edges:", G.edges())
     return G
 
 def efficiencyMetric(G):
@@ -61,8 +60,6 @@ def get_y_add(G, v):
                     
     _sorted = using_indexed_assignment(np.array(eff_list))
     
-    print(eff_list)
-    
     return (_sorted / _sorted.max()) ** 3
 
 def get_y_sub(G, v, _type=0):
@@ -85,8 +82,6 @@ def get_y_sub(G, v, _type=0):
             eff_list.append(score)
                     
     _sorted = using_indexed_assignment(np.array(eff_list))
-    
-    print(eff_list)
     
     return (_sorted / _sorted.max()) ** 3
     

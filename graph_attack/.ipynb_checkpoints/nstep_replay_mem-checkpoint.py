@@ -33,7 +33,7 @@ class NstepReplaySubMemCell(object):
             self.add(list_st[i], list_at[i], list_rt[i], sp, list_term[i])
 
     def sample(self, batch_size):
-        assert self.count >= batch_size
+        #assert self.count >= batch_size
 
         list_st = []
         list_at = []
@@ -78,7 +78,7 @@ class NstepReplayMemCell(object):
         if not self.balance_sample or r_t < 0:
             self.sub_list[0].add(s_t, a_t, r_t, s_prime, terminal)
         else:
-            assert r_t > 0
+            #assert r_t > 0
             key = hash_state_action(s_t, a_t)
             if key in self.state_set:
                 return
@@ -105,11 +105,13 @@ class NstepReplayMem(object):
         self.memory_size = memory_size
 
     def add(self, s_t, a_t, r_t, s_prime, terminal, t):
-        assert t >= 0 and t < self.n_steps
+        #assert t >= 0 and t < self.n_steps
         if t == self.n_steps - 1:
-            assert terminal
+            #assert terminal
+            pass
         else:
             assert not terminal
+            
         self.mem_cells[t].add(s_t, a_t, r_t, s_prime, terminal)        
 
     def add_list(self, list_st, list_at, list_rt, list_sp, list_term, t):
