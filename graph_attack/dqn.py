@@ -85,7 +85,7 @@ class Agent(object):
         t_a, t_s = 0, 0
         
         #while not env.isTerminal():
-        for asdf in range(50):
+        for asdf in range(1):
             
             if asdf % 2 == 0:
                 assert self.env.first_nodes == None
@@ -116,6 +116,28 @@ class Agent(object):
                 s_prime = None
             else:
                 s_prime = self.env.cloneState()
+                
+            #print(list_st, list_at, rewards, s_prime, [env.isTerminal()] * len(list_at), t_a)
+            
+            print("\n\nGot here\n\n")
+            
+            print("\n\nlist_st:")
+            print(list_st)
+            
+            print("\n\nlist_at:")
+            print(list_at)
+            
+            print("\n\nrewards:")
+            print(rewards)
+            
+            print("\n\ns_sprime:")
+            print(s_prime)
+            
+            print("\n\nstep_cound:")
+            print(t_a)
+            
+            
+            quit()
                 
             if action_type == 0:
                 self.add_mem_pool.add_list(list_st, list_at, rewards, s_prime, [env.isTerminal()] * len(list_at), t_a)
@@ -148,14 +170,14 @@ class Agent(object):
     def train(self):
         
         # set up progress bar
-        pbar = tqdm(range(self.burn_in), unit='batch')
+        #pbar = tqdm(range(self.burn_in), unit='batch')
         
         # maybe warm up?
-        for p in pbar:
-            self.run_simulation()
+        #for p in pbar:
+        #    self.run_simulation()
         
         # set up real progress bar
-        pbar = tqdm(range(local_args.num_steps), unit='steps')      # number of iterations to train?
+        pbar = tqdm(range(GLOBAL_NUM_STEPS), unit='steps')      # number of iterations to train?
         
         # set optimizer
         optimizer = optim.Adam(self.net.parameters(), lr=cmd_args.learning_rate)
@@ -228,6 +250,7 @@ class Agent(object):
         log_out.close()
 
 GLOBAL_PHASE = 'train'
+GLOBAL_NUM_STEPS = 1
 
 if __name__ == '__main__':
     

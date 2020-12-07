@@ -24,9 +24,43 @@ from rl_common import local_args
 
 def greedy_actions(q_values, banned_list):
     
-    actions = torch.argmax(q_values, dim=-1)
+    print("*********", type(q_values), "*********")
+    
+    
+    
+    
+    
+    
 
     return actions
+
+def greedy_actions(q_values, v_p, banned_list):
+    
+    print("greedy_actions input shape:", q_values.shape)
+    
+    actions = []
+    offset = 0
+    banned_acts = []
+    prefix_sum = v_p.data.cpu().numpy()
+    for i in range(len(prefix_sum)):
+        n_nodes = prefix_sum[i] - offset
+
+        if banned_list is not None and banned_list[i] is not None:
+            for j in banned_list[i]:
+                banned_acts.append(offset + j)                    
+        offset = prefix_sum[i]
+
+    q_values = q_values.data.clone()
+    if len(banned_acts):
+        q_values[banned_acts, :] = np.finfo(np.float64).min
+    jmax = JaggedMaxModule()
+    values, actions = jmax(Variable(q_values), v_p)
+    
+    actions = torch.argmax(q_values, dim=-1)
+    
+    print("greedy_actions output shape:", actions.shape)
+
+    return actions.data, values.data
     
 class QNet(nn.Module):
     def __init__(self, s2v_module = None):
@@ -50,6 +84,8 @@ class QNet(nn.Module):
         
         self.sub_linear_1 = nn.Linear(embed_dim * 2, local_args.mlp_hidden)
         self.sub_linear_out = nn.Linear(local_args.mlp_hidden, 1)
+        
+        print("Linear output shape:", local_args.mlp_hidden)
 
         
         weights_init(self)
@@ -63,10 +99,13 @@ class QNet(nn.Module):
         else:
             self.s2v = s2v_module
 
+    # batch_graph is the graph, picked_nodes is the edge stub
     def PrepareFeatures(self, batch_graph, picked_nodes):
+        
         n_nodes = 0
         prefix_sum = []
         picked_ones = []
+        
         for i in range(len(batch_graph)):
             if picked_nodes is not None and picked_nodes[i] is not None:
                 assert picked_nodes[i] >= 0 and picked_nodes[i] < batch_graph[i].num_nodes
@@ -115,9 +154,17 @@ class QNet(nn.Module):
 
     # type = 0 for add, 1 for subtract
     def forward(self, states, actions, greedy_acts = False, _type=0):
+        
+        print("-----------", "starting forward", "-----------")
+        
+        
         batch_graph, picked_nodes, banned_list = zip(*states)
+        
+        print("Batch graph len:", len(batch_graph))
 
         node_feat, prefix_sum = self.PrepareFeatures(batch_graph, picked_nodes)
+        
+        print("node_feat shape:", len(node_feat))
         
         if cmd_args.ctx == 'gpu':
             node_feat = node_feat.cuda()
@@ -142,9 +189,11 @@ class QNet(nn.Module):
         else:
             embed_s_a = F.relu( self.add_linear_1(embed_s_a) )
             raw_pred = self.add_linear_out(embed_s_a)
+            
+        print("DQN output shape:", raw_pred.shape)
         
         if greedy_acts:
-            actions = greedy_actions(raw_pred, banned_list)
+            actions = greedy_actions(raw_pred, prefix_sum, banned_list)
             
         return actions, raw_pred, prefix_sum
 
