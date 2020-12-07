@@ -19,31 +19,14 @@ from pytorch_util import weights_init
 sys.path.append('%s/../common' % os.path.dirname(os.path.realpath(__file__)))
 from graph_embedding import EmbedMeanField, EmbedLoopyBP
 from cmd_args import cmd_args
-from modules.custom_mod import JaggedMaxModule
-
 
 from rl_common import local_args
 
-def greedy_actions(q_values, v_p, banned_list):
-    actions = []
-    offset = 0
-    banned_acts = []
-    prefix_sum = v_p.data.cpu().numpy()
-    for i in range(len(prefix_sum)):
-        n_nodes = prefix_sum[i] - offset
+def greedy_actions(q_values, banned_list):
+    
+    actions = torch.argmax(q_values, dim=-1)
 
-        if banned_list is not None and banned_list[i] is not None:
-            for j in banned_list[i]:
-                banned_acts.append(offset + j)                    
-        offset = prefix_sum[i]
-
-    q_values = q_values.data.clone()
-    if len(banned_acts):
-        q_values[banned_acts, :] = np.finfo(np.float64).min
-    jmax = JaggedMaxModule()
-    values, actions = jmax(Variable(q_values), v_p)
-
-    return actions.data, values.data
+    return actions
     
 class QNet(nn.Module):
     def __init__(self, s2v_module = None):
@@ -60,11 +43,15 @@ class QNet(nn.Module):
             embed_dim = cmd_args.latent_dim
         else:
             embed_dim = cmd_args.out_dim
-        if local_args.mlp_hidden:
-            self.linear_1 = nn.Linear(embed_dim * 2, local_args.mlp_hidden)
-            self.linear_out = nn.Linear(local_args.mlp_hidden, 1)
-        else:
-            self.linear_out = nn.Linear(embed_dim * 2, 1)
+        
+        #if local_args.mlp_hidden:
+        self.add_linear_1 = nn.Linear(embed_dim * 2, local_args.mlp_hidden)
+        self.add_linear_out = nn.Linear(local_args.mlp_hidden, 1)
+        
+        self.sub_linear_1 = nn.Linear(embed_dim * 2, local_args.mlp_hidden)
+        self.sub_linear_out = nn.Linear(local_args.mlp_hidden, 1)
+
+        
         weights_init(self)
 
         if s2v_module is None:
@@ -126,7 +113,8 @@ class QNet(nn.Module):
         graph_embed = torch.index_select(graph_embed, 0, rep_idx)
         return graph_embed
 
-    def forward(self, time_t, states, actions, greedy_acts = False):
+    # type = 0 for add, 1 for subtract
+    def forward(self, states, actions, greedy_acts = False, _type=0):
         batch_graph, picked_nodes, banned_list = zip(*states)
 
         node_feat, prefix_sum = self.PrepareFeatures(batch_graph, picked_nodes)
@@ -146,13 +134,16 @@ class QNet(nn.Module):
         
         embed_s_a = torch.cat((embed, graph_embed), dim=1)
 
-        if local_args.mlp_hidden:
-            embed_s_a = F.relu( self.linear_1(embed_s_a) )
-        
-        raw_pred = self.linear_out(embed_s_a)
+        #if local_args.mlp_hidden:
+        if _type:
+            embed_s_a = F.relu( self.sub_linear_1(embed_s_a) )
+            raw_pred = self.sub_linear_out(embed_s_a)
+        else:
+            embed_s_a = F.relu( self.add_linear_1(embed_s_a) )
+            raw_pred = self.add_linear_out(embed_s_a)
         
         if greedy_acts:
-            actions, _ = greedy_actions(raw_pred, prefix_sum, banned_list)
+            actions = greedy_actions(raw_pred, banned_list)
             
         return actions, raw_pred, prefix_sum
 
@@ -175,9 +166,3 @@ class NStepQNet(nn.Module):
 
         return self.list_mod[time_t](time_t, states, actions, greedy_acts)
 """
-
-def a:
-    asdf
-    
-
-a(4)

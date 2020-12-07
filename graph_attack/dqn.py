@@ -36,19 +36,21 @@ class Agent(object):
             self.test_g_list = g_list
         else:
             self.test_g_list = test_g_list
-        self.mem_pool = NstepReplayMem(memory_size=50000, n_steps=2)
+            
+        self.add_mem_pool = NstepReplayMem(memory_size=50000, n_steps=2)
+        self.sub_mem_pool = NstepReplayMem(memory_size=50000, n_steps=2)
         self.env = env
         self.net = QNet()
         self.old_net = QNet()
-        #self.net = NStepQNet(2)
-        #self.old_net = NStepQNet(2)
+
         if cmd_args.ctx == 'gpu':
             self.net = self.net.cuda()
             self.old_net = self.old_net.cuda()
+
         self.eps_start = 1.0
         self.eps_end = 1.0
         self.eps_step = 10000
-        self.burn_in = 100              # number of iterations to run first set ("intial burning in to memeory") of simulations?
+        self.burn_in = 100              # number of iterations to run first set ("intial burning in to memory") of simulations?
         self.step = 0
 
         self.best_eval = None
@@ -60,7 +62,8 @@ class Agent(object):
     def take_snapshot(self):
         self.old_net.load_state_dict(self.net.state_dict())
 
-    def make_actions(self, time_t, greedy=False):
+    # type = 0 for add, 1 for subtract
+    def make_actions(self, greedy=True, _type = 0):
         self.eps = self.eps_end + max(0., (self.eps_start - self.eps_end)
                 * (self.eps_step - max(0., self.step)) / self.eps_step)
 
@@ -68,36 +71,75 @@ class Agent(object):
             actions = self.env.uniformRandActions()
         else:
             cur_state = self.env.getStateRef()
-            actions, _, _ = self.net(time_t, cur_state, None, greedy_acts=True)
+            
+            actions, _, _ = self.net(cur_state, None, greedy_acts=True, _type=_type)
+            
             actions = list(actions.cpu().numpy())
             
         return actions
 
     def run_simulation(self):
-        if (self.pos + 1) * cmd_args.batch_size > len(self.sample_idxes):
-            self.pos = 0
-            random.shuffle(self.sample_idxes)
 
-        selected_idx = self.sample_idxes[self.pos * cmd_args.batch_size : (self.pos + 1) * cmd_args.batch_size]
-        self.pos += 1
-        self.env.setup([self.g_list[idx] for idx in selected_idx])
+        self.env.setup(g_list)
 
-        t = 0
-        while not env.isTerminal():
-            list_at = self.make_actions(t)
+        t_a, t_s = 0, 0
+        
+        #while not env.isTerminal():
+        for asdf in range(20):
+            
+            # --------------- Add Action ---------------
+            
+            # generate action
+            list_at = self.make_actions(_type=0)
             list_st = self.env.cloneState()
-            self.env.step(list_at)
-
-            assert (env.rewards is not None) == env.isTerminal()
+            
+            # get rewards
+            
+            if self.env.first_nodes is not None:
+                rewards = self.env.get_rewards(list_at, _type=0)
+            else:
+                rewards = [0] * len(g_list)
+            
+            # execute the action to update the graph
+            self.env.step(list_at, _type = 0)
+            
+            # get next state
             if env.isTerminal():
-                rewards = env.rewards
                 s_prime = None
             else:
-                rewards = np.zeros(len(list_at), dtype=np.float32)
                 s_prime = self.env.cloneState()
 
-            self.mem_pool.add_list(list_st, list_at, rewards, s_prime, [env.isTerminal()] * len(list_at), t)
-            t += 1
+            self.add_mem_pool.add_list(list_st, list_at, rewards, s_prime, [env.isTerminal()] * len(list_at), t_a)
+            
+            t_a += 1
+            
+            # --------------- Subtract Action ---------------
+            
+            # generate action
+            list_at = self.make_actions(_type=1)
+            list_st = self.env.cloneState()
+            
+            # get rewards
+            if self.env.first_nodes is not None:
+                rewards = self.env.get_rewards(list_at, _type=1)
+
+            else:
+                rewards = [0] * len(g_list)
+            
+            # execute the action to update the graph
+            self.env.step(list_at, _type = 1)
+
+            # get next state
+            if env.isTerminal():
+                s_prime = None
+            else:
+                s_prime = self.env.cloneState()
+
+            self.sub_mem_pool.add_list(list_st, list_at, rewards, s_prime, [env.isTerminal()] * len(list_at), t_s)
+            
+            t_s += 1
+            
+            
 
     def eval(self):
         self.env.setup(deepcopy(self.test_g_list))
@@ -121,7 +163,6 @@ class Agent(object):
         return reward, test_loss[1]
 
     def train(self):
-        log_out = open(cmd_args.logfile, 'w', 0)
         
         # set up progress bar
         pbar = tqdm(range(self.burn_in), unit='batch')
@@ -155,7 +196,11 @@ class Agent(object):
             # 
             
             # list_st = states, list_at = actions
-            cur_time, list_st, list_at, list_rt, list_s_primes, list_term = self.mem_pool.sample(batch_size=cmd_args.batch_size)
+            cur_time, list_st, list_at, list_rt, list_s_primes, list_term = self.add_mem_pool.sample(
+                batch_size=cmd_args.batch_size)
+            
+            cur_time, list_st, list_at, list_rt, list_s_primes, list_term = self.sub_mem_pool.sample(
+                batch_size=cmd_args.batch_size)
 
             
             list_target = torch.Tensor(list_rt)
@@ -179,45 +224,56 @@ class Agent(object):
             # list_target = get_supervision(self.env.classifier, list_st, list_at)
             list_target = Variable(list_target.view(-1, 1))
 
-            # q_sa = raw_pred
-            _, q_sa, _ = self.net(cur_time, list_st, list_at)
-
-            loss = F.mse_loss(q_sa, list_target)
+            # q_sa = raw_pred     
+            _, q_sa_add, _ = self.net(1, cur_time, list_st, list_at)
+            _, q_sa_sub, _ = self.net(0, cur_time, list_st, list_at)
+            
+            # list_target [add_target, sub_target]
+            
+            loss_add = F.mse_loss(q_sa_add, list_target[0])
             optimizer.zero_grad()
-            loss.backward()
+            loss_add.backward()
             optimizer.step()
-            pbar.set_description('exp: %.5f, loss: %0.5f' % (self.eps, loss) )
+            
+            loss_sub = F.mse_loss(q_sa_sub, list_target[1])
+            optimizer.zero_grad()
+            loss_sub.backward()
+            optimizer.step()
+            
+            pbar.set_description('exp: %.5f, loss: %0.5f' % (self.eps, loss_add + loss_sub) )
 
         log_out.close()
 
+GLOBAL_PHASE = 'train'
 
 if __name__ == '__main__':
-    #random.seed(cmd_args.seed)
-    #np.random.seed(cmd_args.seed)
-    #torch.manual_seed(cmd_args.seed)
-
-    #label_map, _, g_list = load_graphs()
+    
+    # generate graphs
     n_graphs = 5
     output = Generate_dataset(n_graphs)
+    g_list, test_glist = load_graphs(output, n_graphs)
     
-    train_list, test_list = load_graphs(output, n_graphs)
-    # get list of graphs
-
-    #random.shuffle(g_list)
     #base_classifier = load_base_model(label_map, g_list)
+    
     base_args = {'gm': 'mean_field', 'feat_dim': 2, 'latent_dim': 10, 'out_dim': 20, 'max_lv': 5, 'hidden': 1}
     base_classifier = GraphClassifier(num_classes=20, **base_args)
-    env = GraphEdgeEnv(base_classifier, n_edges = 1)
+    
+    env = GraphEdgeEnv(base_classifier)
     
     if cmd_args.frac_meta > 0:
-        num_train = int( len(g_list) * (1 - cmd_args.frac_meta) )
-        agent = Agent(g_list[:num_train], g_list[num_train:], env)
+        num_train = int( len(g_list) * (1 - cmd_args.frac_meta))
+        agent = Agent(g_list, test_glist[num_train:], env)
     else:
         agent = Agent(g_list, None, env)
     
-    if cmd_args.phase == 'train':
+    if GLOBAL_PHASE == 'train':
+        
+        print("\n\nStarting Training Loop\n\n")
+        
         agent.train()
+        
     else:
+        print("\n\nStarting Evaluation Loop\n\n")
         agent.net.load_state_dict(torch.load(cmd_args.save_dir + '/epoch-best.model'))
         agent.eval()
         

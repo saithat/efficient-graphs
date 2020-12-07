@@ -13,6 +13,7 @@ import torch.optim as optim
 from tqdm import tqdm
 from copy import deepcopy
 import pickle as cp
+
 cmd_opt = argparse.ArgumentParser(description='Argparser locally')
 cmd_opt.add_argument('-mlp_hidden', type=int, default=64, help='mlp hidden layer size')
 cmd_opt.add_argument('-att_embed_dim', type=int, default=64, help='att_embed_dim')
@@ -26,15 +27,23 @@ from graph_embedding import S2VGraph
 from cmd_args import cmd_args
 from dnn import GraphClassifier
 
+from message import get_y_add, get_y_sub
+
 sys.path.append('%s/../data_generator' % os.path.dirname(os.path.realpath(__file__)))
 from data_util import load_pkl
 
 sys.path.append('%s/../graph_classification' % os.path.dirname(os.path.realpath(__file__)))
 from graph_common import loop_dataset
 
+GLOBAL_PREFIX = 20
+
+# replacement for deprecated nx.connected_component_subgraphs()
+def connected_component_subgraphs(G):
+    for c in nx.connected_components(G):
+        yield G.subgraph(c)
+
 class GraphEdgeEnv(object):
-    def __init__(self, classifier, n_edges):
-        self.n_edges = n_edges
+    def __init__(self, classifier):
         self.classifier = classifier
 
     def setup(self, g_list):
@@ -44,14 +53,17 @@ class GraphEdgeEnv(object):
         self.rewards = None
         self.banned_list = None
         self.prefix_sum = []
+        
         n_nodes = 0
+        
         for i in range(len(g_list)):
             n_nodes += g_list[i].num_nodes
             self.prefix_sum.append(n_nodes)
+            
         self.added_edges = []
 
     def bannedActions(self, g, node_x):        
-        comps = [c for c in nx.connected_component_subgraphs(g)]
+        comps = [c for c in connected_component_subgraphs(g)]
         set_id = {}
         for i in range(len(comps)):
             for j in comps[i].nodes():
@@ -62,23 +74,71 @@ class GraphEdgeEnv(object):
             if set_id[i] != set_id[node_x] or i == node_x:
                 banned_actions.add(i)
         return banned_actions
+    
+    # type = 0 for add, 1 for subtract
+    def get_rewards(self, actions, _type=0):
+        
+        # for i in range(len(g_list)):
+        #     edge stub = self.first_nodes[i]
+        #     graph = g_list[i]
+        
+        rewards = []
+        
+        for i in range(len(self.g_list)):
+            g = self.g_list[i].to_networkx()
+            
+            if _type:
+                Y = get_y_sub(g, self.first_nodes[i])
+            else:
+                Y = get_y_add(g, self.first_nodes[i])
+            
+            R = np.dot(actions[i], Y)
+            
+            rewards.append(R)
+            
+        return rewards
+            
 
-    def step(self, actions):
+    # type = 0 for add, 1 for subtract
+    def step(self, actions, _type = 0):
+        
+        # if edge stub is none
         if self.first_nodes is None: # pick the first node of edge
             assert self.n_steps % 2 == 0
+            
+            # set edge stub to action
             self.first_nodes = actions
             self.banned_list = []
+            
             for i in range(len(self.g_list)):
                 self.banned_list.append(self.bannedActions(self.g_list[i].to_networkx(), self.first_nodes[i]))                
-        else: # edge picked            
-            self.added_edges = []
-            for i in range(len(self.g_list)):
+        
+        # if edge stub is not None
+        else:   
+            
+            #self.added_edges = []
+
+            for i in range(len(g_list)):
+            
                 g = self.g_list[i].to_networkx()
-                g.add_edge(self.first_nodes[i], actions[i]) 
+               
+                if _type:
+                    # remove edge between edge stub and action
+                    g.remove_edge(self.first_nodes[i], actions[i])
+
+                else:
+                    # create edge between edge stub and action
+                    g.add_edge(self.first_nodes[i], actions[i])
+
+            
                 self.added_edges.append((self.first_nodes[i], actions[i]))
+            
                 self.g_list[i] = S2VGraph(g, label = self.g_list[i].label)
-            self.first_nodes = None
-            self.banned_list = None
+             
+                # set edge stub to none
+                self.first_nodes = None
+                self.banned_list = None
+        
         self.n_steps += 1
 
         if self.isTerminal():
@@ -89,17 +149,13 @@ class GraphEdgeEnv(object):
 
     def uniformRandActions(self):
         act_list = []
-        offset = 0
-        for i in range(len(self.prefix_sum)):
-            n_nodes = self.prefix_sum[i] - offset
-
-            if self.first_nodes is None:
-                act_list.append(np.random.randint(n_nodes))
+        for i in range(len(self.g_list)):
+            if self.first_nodes[i] is None:
+                act_list.append(np.random.randint(GLOBAL_PREFIX))
             else:
                 banned_actions = self.banned_list[i]
-                cands = list(set(range(n_nodes)) - banned_actions)
+                cands = list(set(range(GLOBAL_PREFIX)) - banned_actions)
                 act_list.append(random.choice(cands))
-            offset = self.prefix_sum[i]
         return act_list
 
     def sampleActions(self, probs, greedy=False):
@@ -125,8 +181,6 @@ class GraphEdgeEnv(object):
         return act_list
 
     def isTerminal(self):
-        if self.n_steps == 2 * self.n_edges:
-            return True
         return False
 
     def getStateRef(self):
@@ -146,18 +200,20 @@ class GraphEdgeEnv(object):
         if self.banned_list is not None:
             b_list = self.banned_list[:]
 
-        return zip(deepcopy(self.g_list), cp_first, b_list)
+        return list(zip(deepcopy(self.g_list), cp_first, b_list))
 
 def load_graphs(graph_tuples, n_graphs, frac_train=None):
-    train_glist = []
-    test_glist = []
+    
     if (frac_train is not None):
         frac_train = frac_train
     else:
         frac_train = 0.8
+        
     num_train = int(frac_train * n_graphs)
-    train_glist += [S2VGraph(graph_tuples[j][0]) for j in range(num_train)]
-    test_glist += [S2VGraph(graph_tuples[j][0]) for j in range(num_train, n_graphs)]
+    
+    train_glist = [S2VGraph(graph_tuples[j]) for j in range(num_train)]
+    test_glist = [S2VGraph(graph_tuples[j]) for j in range(num_train, n_graphs)]
+    
     print('# train:', len(train_glist), ' # test:', len(test_glist))
 
     return train_glist, test_glist
