@@ -22,7 +22,7 @@ from cmd_args import cmd_args
 
 from rl_common import local_args
 
-def greedy_actions(q_values, banned_list):
+def greedy_actions(q_values, banned_list, _type):
         
     actions = []
     offset = 0
@@ -169,7 +169,7 @@ class QNet(nn.Module):
             raw_pred = self.add_linear_out(embed_s_a)
                     
         if greedy_acts:
-            actions = greedy_actions(raw_pred, banned_list)
+            actions = greedy_actions(raw_pred, banned_list, _type=_type)
             
         return actions, raw_pred
 

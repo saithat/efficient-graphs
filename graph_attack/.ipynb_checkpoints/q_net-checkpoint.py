@@ -22,7 +22,7 @@ from cmd_args import cmd_args
 
 from rl_common import local_args
 
-def greedy_actions(q_values, banned_list):
+def greedy_actions(q_values, banned_list, _type):
         
     actions = []
     offset = 0
@@ -37,9 +37,7 @@ def greedy_actions(q_values, banned_list):
     #
     
     num_chunks = q_values.shape[0] // 20
-    
-    print(num_chunks)
-    
+        
     q_list = torch.chunk(q_values[:num_chunks * 20], num_chunks, dim=0)
     
     actions = [torch.argmax(q_val, dim=0) for q_val in q_list]
@@ -171,7 +169,7 @@ class QNet(nn.Module):
             raw_pred = self.add_linear_out(embed_s_a)
                     
         if greedy_acts:
-            actions = greedy_actions(raw_pred, banned_list)
+            actions = greedy_actions(raw_pred, banned_list, _type=_type)
             
         return actions, raw_pred
 

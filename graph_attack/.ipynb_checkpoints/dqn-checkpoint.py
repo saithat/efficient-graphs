@@ -133,11 +133,14 @@ class Agent(object):
     def eval(self):
         self.env.setup(deepcopy(self.test_g_list))
         t = 0
+        
         while not self.env.isTerminal():
-            list_at = self.make_actions(t, greedy=True)
+            list_at = self.make_actions(greedy=True, _type=(t % 4) // 2)
             self.env.step(list_at)
             t += 1
+            
         test_loss = loop_dataset(env.g_list, env.classifier, list(range(len(env.g_list))))
+        
         print('\033[93m average test: loss %.5f acc %.5f\033[0m' % (test_loss[0], test_loss[1]))
 
         if cmd_args.phase == 'train' and self.best_eval is None or test_loss[1] < self.best_eval:
