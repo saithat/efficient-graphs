@@ -19,7 +19,7 @@ sys.path.append('%s/../common' % os.path.dirname(os.path.realpath(__file__)))
 from cmd_args import cmd_args
 
 import warnings
-warnings.filterwarnings("ignore")
+#warnings.filterwarnings("ignore")
 
 from rl_common import GraphEdgeEnv, local_args, load_graphs, test_graphs, load_base_model
 from nstep_replay_mem import NstepReplayMem
@@ -87,24 +87,7 @@ class Agent(object):
             q_vals.append(tmp)
                         
         return actions, q_vals
-    
-    def Q_loss(self, q_vals, rewards, q_primes):
-        
-        # predicted_Q = Q(S, A)
-        predicted_Q = []
-        
-        for i in range(len(q_vals)):
-            predicted_Q.append(rewards[i] + q_primes[i])
-            
-        predicted_Q = np.array(predicted_Q)
-        
-        # actual_Q = (R + max_a Q(S', a))
-        actual_Q = np.array(q_vals)
-        
-        # Loss = (actual_Q - predicted_Q) ^ 2
-        loss = (predicted_Q - actual_Q) ** 2
-        
-        return torch.from_numpy(loss)
+
 
     def run_simulation(self):
 
@@ -155,9 +138,24 @@ class Agent(object):
             actual_Q = torch.Tensor(rewards) + torch.Tensor(q_primes)
             
             print("\n\nActions:", list_at)
-            print("\n\nQ_vals:", predicted_Q.shape)
+            
             print("\n\nRewards:", rewards)
             print("\n\nQ_prime:", q_primes)
+            
+            print("\n\nQ_vals:", predicted_Q.shape)
+            
+            
+            
+            
+            trailing = 20 * (predicted_Q.shape[0] // 20)
+            
+            #reshaped_Q = Variable(predicted_Q.view(int(trailing / 20), 20))
+            #reshaped_Q = torch.argmax(reshaped_Q, axis=1)
+            
+            print("\n\nQ_vals:", predicted_Q.shape)
+            
+            #predicted_Q = torch.chunk(predicted_Q[:num_chunks * 20], num_chunks, dim=0)
+            #torch.
             
             loss = F.mse_loss(predicted_Q, actual_Q)
             
@@ -197,6 +195,8 @@ class Agent(object):
         
         # for each iteration
         for self.step in pbar:
+            
+            
 
             # run simulation
             self.run_simulation()

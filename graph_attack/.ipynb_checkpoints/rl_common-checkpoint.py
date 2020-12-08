@@ -97,6 +97,7 @@ class GraphEdgeEnv(object):
             else:
                 Y = get_y_add(g, self.first_nodes[i])
             
+            
             R = Y[actions[i]]
             
             rewards.append(R)
