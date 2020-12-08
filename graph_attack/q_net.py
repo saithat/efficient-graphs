@@ -136,8 +136,34 @@ class QNet(nn.Module):
         print(picked_nodes)
         
 
+        banned = []
+
+        for g_ind in range(len(batch_graph)):
+            g_netx = batch_graph[g_ind].to_networkx()
+            #print("picked nodes: ", picked_nodes[g_ind])
+            #print("nodes: ", g_netx.nodes)
+            #print("edges: ", g_netx.edges)
+            mask = np.ones(len(g_netx.nodes))
+
+            if(picked_nodes[g_ind] is not None):
+                rel_edges = [item for item in g_netx.edges if picked_nodes[g_ind] in item]
+                rel_edges = list(sum(rel_edges, ()))
+                exclude_these = list(set(rel_edges))
+                #print("exclude :", exclude_these)
+                #mask = mask[exclude_these]
+
+                for b in range(len(list(g_netx.nodes))):
+                    #print("node val: ", list(g_netx.nodes)[b])
+                    if(list(g_netx.nodes)[b] in exclude_these):
+                        #print("excluded")
+                        mask[b] = -100
+            #print("mask: ", mask)
+            banned.append(mask)
+            
+
         node_feat = self.PrepareFeatures(batch_graph, picked_nodes)
-        
+        banned_list = banned
+        #print(banned_list)
         
         if cmd_args.ctx == 'gpu':
             node_feat = node_feat.cuda()
