@@ -39,7 +39,7 @@ def greedy_actions(q_values, banned_list, _type):
     for i in range(len(q_list)):
         actions.append(np.argmax(q_list[i].numpy().T + banned_list[i]))
         
-    actions = [torch.argmax(q_val, dim=0) for q_val in q_list]
+    #actions = [torch.argmax(q_val, dim=0) for q_val in q_list]
     
     return actions, q_list
     
@@ -101,6 +101,10 @@ class QNet(nn.Module):
     # type = 0 for add, 1 for subtract
     def forward(self, states, actions=None, greedy_acts = False, _type=0):
         
+        #if(_type == 0):
+            #print("Add")
+        #else:
+            #print("Sub")
         batch_graph, picked_nodes, banned_list = zip(*states)
         
         
@@ -115,6 +119,9 @@ class QNet(nn.Module):
             if(picked_nodes[g_ind] is not None):
                 
                 banned_idxs = []
+                if _type == 0:
+                    banned_idxs.append(picked_nodes[g_ind])
+                    
                 for _node in range(20):
                     
                     if _type == 0:
@@ -125,7 +132,7 @@ class QNet(nn.Module):
                         if g_netx.has_edge(_node, picked_nodes[g_ind]) == False:
                             banned_idxs.append(_node)
                             
-                mask[banned_idxs] = -100
+                mask[banned_idxs] = -1e10
                 
             banned_list.append(mask)
             
@@ -140,6 +147,7 @@ class QNet(nn.Module):
         graph_embed = []
         
         for i in range(len(batch_graph)):
+            #print(batch_graph[i].to_networkx().edges)
             tmp_embed, tmp_graph_embed = self.s2v([batch_graph[i]], node_feat[i], None, pool_global=True)
             
             embed.append(tmp_embed)
@@ -153,11 +161,11 @@ class QNet(nn.Module):
         if _type:
             embed_s_a = F.relu( self.sub_linear_1(embed_s_a) )
             raw_pred = self.sub_linear_out(embed_s_a)
-            print("using Sub network")
+            #print("using Sub network")
         else:
             embed_s_a = F.relu( self.add_linear_1(embed_s_a) )
             raw_pred = self.add_linear_out(embed_s_a)
-            print("using Add network")
+            #print("using Add network")
                     
         if greedy_acts:
             actions, raw_pred = greedy_actions(raw_pred, banned_list, _type=_type)

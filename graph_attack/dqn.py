@@ -33,6 +33,7 @@ from graph_common import loop_dataset
 from message import Generate_dataset
 
 import matplotlib.pyplot as plt
+from graph_embedding import S2VGraph
 
 class Agent(object):
     def __init__(self, g_list, test_g_list, env):
@@ -78,8 +79,9 @@ class Agent(object):
 
         actions, q_arrs = self.net(cur_state, None, greedy_acts=True, _type=_type)
 
-        actions = torch.cat(actions)
-        actions = actions.numpy().tolist()
+        #actions = torch.cat(actions)
+        #actions = actions.numpy().tolist()
+        #actions = actions.tolist()
 
         q_vals = []
 
@@ -106,6 +108,20 @@ class Agent(object):
             
             if asdf % 2 == 0:
                 assert self.env.first_nodes == None
+
+
+            for i in range(len(self.g_list)):
+            
+                g = self.g_list[i].to_networkx()
+
+                con_nodes = list(set(list(sum(g.edges, ()))))
+                for j in range(20):
+                    if (j not in con_nodes):
+                        rand_num = np.random.randint(0, 20)
+                        g.add_edge(j, rand_num)
+                        self.env.added_edges.append((j, rand_num))
+            
+                self.g_list[i] = S2VGraph(g, label = self.g_list[i].label)
             
             action_type = (asdf % 4) // 2
                 
@@ -124,6 +140,7 @@ class Agent(object):
             # get Rewards
             if self.env.first_nodes is not None:
                 rewards = self.env.get_rewards(list_at, _type=action_type)
+                avg_rewards.append(sum(rewards)/len(rewards))
             else:
                 rewards = [0] * len(g_list)
             
@@ -145,12 +162,11 @@ class Agent(object):
             
             actual_Q = torch.Tensor(rewards) + torch.Tensor(q_primes)
             
-            print("\n\nActions:", list_at)
-            print("\n\nQ_vals:", predicted_Q.shape)
-            print("\n\nRewards:", rewards)
-            print('avg: ', sum(rewards)/len(rewards))
-            avg_rewards.append(sum(rewards)/len(rewards))
-            print("\n\nQ_prime:", q_primes)
+            #print("\n\nActions:", list_at)
+            #print("\n\nQ_vals:", predicted_Q.shape)
+            #print("\n\nRewards:", rewards)
+            #print('avg: ', sum(rewards)/len(rewards))
+            #print("\n\nQ_prime:", q_primes)
             
             loss = F.mse_loss(predicted_Q, actual_Q)
             
@@ -189,31 +205,30 @@ class Agent(object):
         
         # set up progress bar
         pbar = tqdm(range(GLOBAL_NUM_STEPS), unit='steps')
-        
+        avgs = []
         # for each iteration
         for self.step in pbar:
-            print("blah")
-
             # run simulation
             # side effects?
-            tmp = self.run_simulation()
-            print("tmp: ", tmp)
-            avg_reward_step.append(sum(tmp)/len(tmp))
+            avgs += self.run_simulation()
+            #print("tmp: ", tmp)
+            #avg_reward_step.append(sum(tmp)/len(tmp))
             #plt.plot(tmp)
             #plt.show()
-            mov_avg = np.convolve(np.array(tmp), np.ones(4), 'valid') / 4
-            print("mov avg: ", list(mov_avg))
-            print(type(mov_avg))
-            print(mov_avg.shape)
-            plt.clf()
-            plt.plot(list(mov_avg))
-            plt.title('running average of average rewards')
-            plt.show()
-            #plt.savefig('test.png')            
+            #plt.savefig('test.png')
+        print("avgs: ",avgs)
+        mov_avg = np.convolve(np.array(avgs), np.ones(4), 'valid') / 4
+        print("mov avg: ", list(mov_avg))
+        print(type(mov_avg))
+        print(mov_avg.shape)
+        plt.clf()
+        plt.plot(list(mov_avg))
+        plt.title('running average of average rewards')
+        plt.show()          
 
 GLOBAL_PHASE = 'train'
-GLOBAL_NUM_STEPS = 1
-GLOBAL_EPISODE_STEPS = 500
+GLOBAL_NUM_STEPS = 100
+GLOBAL_EPISODE_STEPS = 50
 GLOBAL_NUM_GRAPHS = 10
 
 if __name__ == '__main__':
