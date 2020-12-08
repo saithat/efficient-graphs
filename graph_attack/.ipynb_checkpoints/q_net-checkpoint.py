@@ -33,20 +33,7 @@ def greedy_actions(q_values, banned_list, _type):
     num_chunks = q_values.shape[0] // 20
         
     q_list = torch.chunk(q_values[:num_chunks * 20], num_chunks, dim=0)
-    
-    # To Do:
-    #
-    # Banned actions get minimum value
-    #
-    #
-    
-    #if len(banned_list) > 1:
-        #print(q_list[0].numpy(), q_list[0].numpy().shape)
-        #print(banned_list[0], banned_list[0].shape)
-        #print(q_list[0].numpy().T + banned_list[0], (q_list[0].numpy().T + banned_list[0]).shape)
-        #print(np.argmax(q_list[0].numpy().T + banned_list[0]))
-        #print("\n\n")
-        
+
     actions = []
     
     for i in range(len(q_list)):
@@ -112,27 +99,37 @@ class QNet(nn.Module):
         return node_feat_list
 
     # type = 0 for add, 1 for subtract
-    def forward(self, states, actions, greedy_acts = False, _type=0):
+    def forward(self, states, actions=None, greedy_acts = False, _type=0):
         
         batch_graph, picked_nodes, banned_list = zip(*states)
+        
+        
+        # --------------- Make Banned List ---------------
         
         banned_list = []
 
         for g_ind in range(len(batch_graph)):
             g_netx = batch_graph[g_ind].to_networkx()
-            mask = np.zeros(len(g_netx.nodes))
-
+            mask = np.zeros(20)
+            
             if(picked_nodes[g_ind] is not None):
                 
                 banned_idxs = []
-                
                 for _node in range(20):
-                    if g_netx.has_edge(_node, picked_nodes[g_ind]):
-                        banned_idxs.append(_node)
-                
+                    
+                    if _type == 0:
+                        if g_netx.has_edge(_node, picked_nodes[g_ind]):
+                            banned_idxs.append(_node)
+                    
+                    if _type == 1:
+                        if g_netx.has_edge(_node, picked_nodes[g_ind]) == False:
+                            banned_idxs.append(_node)
+                            
                 mask[banned_idxs] = -100
                 
             banned_list.append(mask)
+            
+        # ------------------------------------------------
         
         node_feat = self.PrepareFeatures(batch_graph, picked_nodes)
         
