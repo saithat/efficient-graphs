@@ -160,6 +160,12 @@ class GraphEdgeEnv(object):
                 act_list.append(random.choice(cands))
         return act_list
 
+    #def really_random(self):
+    #    act_list = []
+    #    for i in range(len(self.g_list)):
+    #        act_list.append(np.random.randint(GLOBAL_PREFIX))
+    #    return act_list
+
     def sampleActions(self, probs, greedy=False):
         offset = 0
         act_list = []

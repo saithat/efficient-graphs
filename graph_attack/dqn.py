@@ -29,6 +29,8 @@ from graph_common import loop_dataset
 
 from message import Generate_dataset
 
+import matplotlib.pyplot as plt
+
 class Agent(object):
     def __init__(self, g_list, test_g_list, env):
         self.g_list = g_list
@@ -78,10 +80,15 @@ class Agent(object):
             actions = actions.numpy().tolist()
                         
         return actions, q_vals
+    
+    #def random_actions(self, _type=0):
+    #    actions = self.env.really_random()
+    #    return actions
 
     def run_simulation(self):
 
         self.env.setup(g_list)
+        avg_rewards = []
 
         t_a, t_s = 0, 0
         
@@ -95,6 +102,7 @@ class Agent(object):
             action_type = (asdf % 2) // 2
                 
             list_at, _ = self.make_actions(_type=action_type)
+            #list_at, _ = self.random_actions(_type=action_type)
                         
             list_st = self.env.cloneState()
             
@@ -120,6 +128,8 @@ class Agent(object):
             
             print("\n\nActions:", list_at)
             print("\n\nRewards:", rewards)
+            print('avg: ', sum(rewards)/len(rewards))
+            avg_rewards.append(sum(rewards)/len(rewards))
             
             # S' actions actions an Q(S', A) values
             sprime_at, sprime_q = self.make_actions(_type=action_type)
@@ -138,6 +148,7 @@ class Agent(object):
             loss.backward()
             optimizer.step()
             '''
+        return avg_rewards
                 
     def Q_loss():
         #actual_Q = ...
@@ -185,16 +196,32 @@ class Agent(object):
         # optimizer = optim.Adam(self.net.parameters(), lr=cmd_args.learning_rate)
         add_optimizer = optim.Adam(self.net.parameters(), lr=cmd_args.learning_rate)
         sub_optimizer = optim.Adam(self.net.parameters(), lr=cmd_args.learning_rate)
+
+        avg_reward_step = []
         
         # for each iteration
         for self.step in pbar:
+            print("blah")
 
             # run simulation
             # side effects?
-            self.run_simulation()
+            tmp = self.run_simulation()
+            print("tmp: ", tmp)
+            avg_reward_step.append(sum(tmp)/len(tmp))
+            #plt.plot(tmp)
+            #plt.show()
+            mov_avg = np.convolve(np.array(tmp), np.ones(4), 'valid') / 4
+            print("mov avg: ", list(mov_avg))
+            print(type(mov_avg))
+            print(mov_avg.shape)
+            plt.clf()
+            plt.plot(list(mov_avg))
+            plt.title('running average of average rewards')
+            plt.show()
+            #plt.savefig('test.png')
             
             exit()
-
+            #return tmp
             # save weights and evalute
             if self.step % 100 == 0:
                 self.take_snapshot()
@@ -254,9 +281,11 @@ class Agent(object):
             pbar.set_description('exp: %.5f, loss: %0.5f' % (self.eps, loss_add + loss_sub) )
 
         log_out.close()
+        print("about to return")
+        return avg_rewards
 
 GLOBAL_PHASE = 'train'
-GLOBAL_NUM_STEPS = 1
+GLOBAL_NUM_STEPS = 10
 GLOBAL_EPISODE_STEPS = 50
 GLOBAL_NUM_GRAPHS = 20
 
@@ -266,6 +295,7 @@ if __name__ == '__main__':
     n_graphs = GLOBAL_NUM_GRAPHS
     output = Generate_dataset(n_graphs)
     g_list, test_glist = load_graphs(output, n_graphs)
+    avg_rds = []
     
     #base_classifier = load_base_model(label_map, g_list)
     
@@ -284,7 +314,11 @@ if __name__ == '__main__':
         
         print("\n\nStarting Training Loop\n\n")
         
-        agent.train()
+        avg_rds = agent.train()
+        print("avg rds: ", avg_rds)
+        mov_avg = np.convolve(np.array(avg_rds), np.ones(4), 'valid') / 4
+        print("mov avg: ", mov_avg)
+
         
     else:
         print("\n\nStarting Evaluation Loop\n\n")
