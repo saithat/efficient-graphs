@@ -18,6 +18,9 @@ from q_net import QNet, greedy_actions
 sys.path.append('%s/../common' % os.path.dirname(os.path.realpath(__file__)))
 from cmd_args import cmd_args
 
+import warnings
+warnings.filterwarnings("ignore")
+
 from rl_common import GraphEdgeEnv, local_args, load_graphs, test_graphs, load_base_model
 from nstep_replay_mem import NstepReplayMem
 
@@ -42,6 +45,8 @@ class Agent(object):
         self.env = env
         self.net = QNet()
         self.old_net = QNet()
+        self.optimizer = optim.Adam(self.net.parameters(), lr=cmd_args.learning_rate)
+
 
         if cmd_args.ctx == 'gpu':
             self.net = self.net.cuda()
@@ -67,17 +72,39 @@ class Agent(object):
         self.eps = self.eps_end + max(0., (self.eps_start - self.eps_end)
                 * (self.eps_step - max(0., self.step)) / self.eps_step)
 
-        if random.random() < self.eps and not greedy:
-            actions = self.env.uniformRandActions()
-        else:
-            cur_state = self.env.getStateRef()
-            
-            actions, q_vals = self.net(cur_state, None, greedy_acts=True, _type=_type)
-            
-            actions = torch.cat(actions)
-            actions = actions.numpy().tolist()
+        cur_state = self.env.getStateRef()
+
+        actions, q_arrs = self.net(cur_state, None, greedy_acts=True, _type=_type)
+
+        actions = torch.cat(actions)
+        actions = actions.numpy().tolist()
+
+        q_vals = []
+
+        for i in range(len(q_arrs)):
+            tmp = q_arrs[i].numpy()
+            tmp = tmp[actions[i]][0]
+            q_vals.append(tmp)
                         
         return actions, q_vals
+    
+    def Q_loss(self, q_vals, rewards, q_primes):
+        
+        # predicted_Q = Q(S, A)
+        predicted_Q = []
+        
+        for i in range(len(q_vals)):
+            predicted_Q.append(rewards[i] + q_primes[i])
+            
+        predicted_Q = np.array(predicted_Q)
+        
+        # actual_Q = (R + max_a Q(S', a))
+        actual_Q = np.array(q_vals)
+        
+        # Loss = (actual_Q - predicted_Q) ^ 2
+        loss = (predicted_Q - actual_Q) ** 2
+        
+        return torch.from_numpy(loss)
 
     def run_simulation(self):
 
@@ -90,22 +117,26 @@ class Agent(object):
             
             if asdf % 2 == 0:
                 assert self.env.first_nodes == None
-            assert self.g_list[0].num_nodes == 20 or self.g_list[0].num_nodes == 21
             
-            action_type = (asdf % 2) // 2
+            action_type = (asdf % 4) // 2
                 
+            # get Actions
             list_at, _ = self.make_actions(_type=action_type)
-                        
+                   
+            # save State
             list_st = self.env.cloneState()
             
-            # get rewards
+            cur_state = self.env.getStateRef()
             
+            _, predicted_Q = self.net(cur_state, None, greedy_acts=False, _type=action_type)
+                        
+            # get Rewards
             if self.env.first_nodes is not None:
                 rewards = self.env.get_rewards(list_at, _type=action_type)
             else:
                 rewards = [0] * len(g_list)
             
-            # execute the action to update the graph
+            # Update graph to get S'
             self.env.step(list_at, _type = action_type)
             
             # get next state
@@ -114,36 +145,26 @@ class Agent(object):
             else:
                 s_prime = self.env.cloneState()
             
-            # Predicted = q_val[action]
-            # Actual = Reward[]
-            # 
+            # get Q(S', A) values
+            try:
+                sprime_at, q_primes = self.make_actions(_type=action_type)
+            
+            except:
+                continue
+            
+            actual_Q = torch.Tensor(rewards) + torch.Tensor(q_primes)
             
             print("\n\nActions:", list_at)
+            print("\n\nQ_vals:", predicted_Q.shape)
             print("\n\nRewards:", rewards)
+            print("\n\nQ_prime:", q_primes)
             
-            # S' actions actions an Q(S', A) values
-            sprime_at, sprime_q = self.make_actions(_type=action_type)
+            loss = F.mse_loss(predicted_Q, actual_Q)
             
-            '''
-            if action_type == 0:
-                loss = F.mse_loss(q_sa_add, list_target[0])
-                t_a += 1
-                
-            else:
-                loss = F.mse_loss(q_sa_sub, list_target[1])
-                t_s += 1
-                
             # pass loss to network
-            optimizer.zero_grad()
+            self.optimizer.zero_grad()
             loss.backward()
-            optimizer.step()
-            '''
-                
-    def Q_loss():
-        #actual_Q = ...
-        #predicted_Q = ...
-        #loss = 
-        pass
+            self.optimizer.step()
                 
     def eval(self):
         self.env.setup(deepcopy(self.test_g_list))
@@ -172,100 +193,26 @@ class Agent(object):
     def train(self):
         
         # set up progress bar
-        #pbar = tqdm(range(self.burn_in), unit='batch')
-        
-        # maybe warm up?
-        #for p in pbar:
-        #    self.run_simulation()
-        
-        # set up real progress bar
-        pbar = tqdm(range(GLOBAL_NUM_STEPS), unit='steps')      # number of iterations to train?
-        
-        # set optimizer
-        # optimizer = optim.Adam(self.net.parameters(), lr=cmd_args.learning_rate)
-        add_optimizer = optim.Adam(self.net.parameters(), lr=cmd_args.learning_rate)
-        sub_optimizer = optim.Adam(self.net.parameters(), lr=cmd_args.learning_rate)
+        pbar = tqdm(range(GLOBAL_NUM_STEPS), unit='steps')
         
         # for each iteration
         for self.step in pbar:
 
             # run simulation
-            # side effects?
             self.run_simulation()
             
             exit()
 
-            # save weights and evalute
-            if self.step % 100 == 0:
-                self.take_snapshot()
-            if self.step % 100 == 0:
-                r, acc = self.eval()
-                log_out.write('%d %.6f %.6f\n' % (self.step, r, acc))
-
-            #
-            # memory replay sample? figure out later
-            # 
-            
-            # list_st = states, list_at = actions
-            cur_time, list_st, list_at, list_rt, list_s_primes, list_term = self.add_mem_pool.sample(
-                batch_size=cmd_args.batch_size)
-            
-            cur_time, list_st, list_at, list_rt, list_s_primes, list_term = self.sub_mem_pool.sample(
-                batch_size=cmd_args.batch_size)
-
-            
-            list_target = torch.Tensor(list_rt)
-            
-            if cmd_args.ctx == 'gpu':
-                list_target = list_target.cuda()
-
-            cleaned_sp = []
-            nonterms = []
-            for i in range(len(list_st)):
-                if not list_term[i]:
-                    cleaned_sp.append(list_s_primes[i])
-                    nonterms.append(i)
-
-            if len(cleaned_sp):
-                _, _, banned = zip(*cleaned_sp)
-                _, q_t_plus_1, prefix_sum_prime = self.old_net(cur_time + 1, cleaned_sp, None)
-                _, q_rhs = greedy_actions(q_t_plus_1, prefix_sum_prime, banned)
-                list_target[nonterms] = q_rhs
-            
-            # list_target = get_supervision(self.env.classifier, list_st, list_at)
-            list_target = Variable(list_target.view(-1, 1))
-
-            # q_sa = raw_pred     
-            _, q_sa_add, _ = self.net(1, cur_time, list_st, list_at)
-            _, q_sa_sub, _ = self.net(0, cur_time, list_st, list_at)
-            
-            # list_target [add_target, sub_target]
-            
-            loss_add = F.mse_loss(q_sa_add, list_target[0])
-            optimizer.zero_grad()
-            loss_add.backward()
-            optimizer.step()
-            
-            loss_sub = F.mse_loss(q_sa_sub, list_target[1])
-            optimizer.zero_grad()
-            loss_sub.backward()
-            optimizer.step()
-            
-            pbar.set_description('exp: %.5f, loss: %0.5f' % (self.eps, loss_add + loss_sub) )
-
-        log_out.close()
-
 GLOBAL_PHASE = 'train'
 GLOBAL_NUM_STEPS = 1
-GLOBAL_EPISODE_STEPS = 50
-GLOBAL_NUM_GRAPHS = 20
+GLOBAL_EPISODE_STEPS = 500
+GLOBAL_NUM_GRAPHS = 10
 
 if __name__ == '__main__':
     
     # generate graphs
-    n_graphs = GLOBAL_NUM_GRAPHS
-    output = Generate_dataset(n_graphs)
-    g_list, test_glist = load_graphs(output, n_graphs)
+    output = Generate_dataset(GLOBAL_NUM_GRAPHS)
+    g_list, test_glist = load_graphs(output, GLOBAL_NUM_GRAPHS)
     
     #base_classifier = load_base_model(label_map, g_list)
     
@@ -273,6 +220,8 @@ if __name__ == '__main__':
     base_classifier = GraphClassifier(num_classes=20, **base_args)
     
     env = GraphEdgeEnv(base_classifier)
+    
+    print("len g_list:", len(g_list))
     
     if cmd_args.frac_meta > 0:
         num_train = int( len(g_list) * (1 - cmd_args.frac_meta))
@@ -290,18 +239,3 @@ if __name__ == '__main__':
         print("\n\nStarting Evaluation Loop\n\n")
         agent.net.load_state_dict(torch.load(cmd_args.save_dir + '/epoch-best.model'))
         agent.eval()
-        
-        # env.setup([g_list[idx] for idx in selected_idx])
-        # t = 0
-        # while not env.isTerminal():
-        #     policy_net = net_list[t]
-        #     t += 1            
-        #     batch_graph, picked_nodes = env.getState()
-        #     log_probs, prefix_sum = policy_net(batch_graph, picked_nodes)
-        #     actions = env.sampleActions(torch.exp(log_probs).data.cpu().numpy(), prefix_sum.data.cpu().numpy(), greedy=True)
-        #     env.step(actions)
-
-        # test_loss = loop_dataset(env.g_list, base_classifier, list(range(len(env.g_list))))
-        # print('\033[93maverage test: loss %.5f acc %.5f\033[0m' % (test_loss[0], test_loss[1]))
-        
-        # print(np.mean(avg_rewards), np.mean(env.rewards))

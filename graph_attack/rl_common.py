@@ -71,8 +71,13 @@ class GraphEdgeEnv(object):
 
         banned_actions = set()
         for i in range(len(g)):
-            if set_id[i] != set_id[node_x] or i == node_x:
-                banned_actions.add(i)
+            
+            try:
+                if set_id[i] != set_id[node_x] or i == node_x:
+                    banned_actions.add(i)
+            except:
+                banned_actions.add(0)
+                
         return banned_actions
     
     # type = 0 for add, 1 for subtract
@@ -111,7 +116,7 @@ class GraphEdgeEnv(object):
             self.banned_list = []
             
             for i in range(len(self.g_list)):
-                self.banned_list.append(self.bannedActions(self.g_list[i].to_networkx(), self.first_nodes[i]))                
+                self.banned_list.append(self.bannedActions(self.g_list[i].to_networkx(), self.first_nodes[i])) 
         
         # if edge stub is not None
         else:   
