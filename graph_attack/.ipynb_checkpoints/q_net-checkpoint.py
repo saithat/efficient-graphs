@@ -29,6 +29,10 @@ def greedy_actions(q_values, banned_list, _type):
     banned_acts = []
     
     q_values = q_values.data.clone()
+        
+    num_chunks = q_values.shape[0] // 20
+        
+    q_list = torch.chunk(q_values[:num_chunks * 20], num_chunks, dim=0)
     
     # To Do:
     #
@@ -36,13 +40,10 @@ def greedy_actions(q_values, banned_list, _type):
     #
     #
     
-    num_chunks = q_values.shape[0] // 20
-        
-    q_list = torch.chunk(q_values[:num_chunks * 20], num_chunks, dim=0)
-    
     actions = [torch.argmax(q_val, dim=0) for q_val in q_list]
+
     
-    return actions
+    return actions, q_list
     
 class QNet(nn.Module):
     def __init__(self, s2v_module = None):
@@ -131,14 +132,16 @@ class QNet(nn.Module):
     def forward(self, states, actions, greedy_acts = False, _type=0):
         
         batch_graph, picked_nodes, banned_list = zip(*states)
+        
+        print(picked_nodes)
+        
 
         node_feat = self.PrepareFeatures(batch_graph, picked_nodes)
         
         
         if cmd_args.ctx == 'gpu':
             node_feat = node_feat.cuda()
-
-            
+ 
         embed = []
         graph_embed = []
         
@@ -147,20 +150,12 @@ class QNet(nn.Module):
             
             embed.append(tmp_embed)
             graph_embed.append(tmp_graph_embed)
-                    
-        dummy = torch.zeros(80, 2)
-        
-        tmp_embed, tmp_graph_embed = self.s2v(batch_graph, dummy, None, pool_global=True)    
-        
-        #embed = torch.FloatTensor(embed)
-        #graph_embed = torch.FloatTensor(graph_embed)
         
         embed = torch.cat(embed)
         graph_embed = torch.cat(graph_embed)
 
         embed_s_a = torch.cat((embed, graph_embed), dim=0)
 
-        #if local_args.mlp_hidden:
         if _type:
             embed_s_a = F.relu( self.sub_linear_1(embed_s_a) )
             raw_pred = self.sub_linear_out(embed_s_a)
@@ -169,7 +164,7 @@ class QNet(nn.Module):
             raw_pred = self.add_linear_out(embed_s_a)
                     
         if greedy_acts:
-            actions = greedy_actions(raw_pred, banned_list, _type=_type)
+            actions, raw_pred = greedy_actions(raw_pred, banned_list, _type=_type)
             
         return actions, raw_pred
 

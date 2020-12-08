@@ -120,6 +120,9 @@ class Agent(object):
                 
             #print(list_st, list_at, rewards, s_prime, [env.isTerminal()] * len(list_at), t_a)
             
+            # Predicted = q_val[action]
+            # Actual = Reward[]
+            
             print("\n\nActions:", list_at)
             print("\n\nRewards:", rewards)
                             
