@@ -72,12 +72,12 @@ class Agent(object):
         else:
             cur_state = self.env.getStateRef()
             
-            actions, _ = self.net(cur_state, None, greedy_acts=True, _type=_type)
+            actions, q_vals = self.net(cur_state, None, greedy_acts=True, _type=_type)
             
             actions = torch.cat(actions)
             actions = actions.numpy().tolist()
                         
-        return actions
+        return actions, q_vals
 
     def run_simulation(self):
 
@@ -86,19 +86,15 @@ class Agent(object):
         t_a, t_s = 0, 0
         
         #while not env.isTerminal():
-        for asdf in range(50):
+        for asdf in range(GLOBAL_EPISODE_STEPS):
             
             if asdf % 2 == 0:
                 assert self.env.first_nodes == None
             assert self.g_list[0].num_nodes == 20 or self.g_list[0].num_nodes == 21
             
-            # generate action
-            if len(self.g_list) == 20:
-                action_type = 0
-            else:
-                action_type = 1
+            action_type = (asdf % 2) // 2
                 
-            list_at = self.make_actions(_type=action_type)
+            list_at, _ = self.make_actions(_type=action_type)
                         
             list_st = self.env.cloneState()
             
@@ -117,21 +113,37 @@ class Agent(object):
                 s_prime = None
             else:
                 s_prime = self.env.cloneState()
-                
-            #print(list_st, list_at, rewards, s_prime, [env.isTerminal()] * len(list_at), t_a)
             
             # Predicted = q_val[action]
             # Actual = Reward[]
+            # 
             
             print("\n\nActions:", list_at)
             print("\n\nRewards:", rewards)
-                            
+            
+            # S' actions actions an Q(S', A) values
+            sprime_at, sprime_q = self.make_actions(_type=action_type)
+            
+            '''
             if action_type == 0:
-                self.add_mem_pool.add_list(list_st, list_at, rewards, s_prime, [env.isTerminal()] * len(list_at), t_a % 2)
+                loss = F.mse_loss(q_sa_add, list_target[0])
                 t_a += 1
+                
             else:
-                self.sub_mem_pool.add_list(list_st, list_at, rewards, s_prime, [env.isTerminal()] * len(list_at), t_s % 2)
+                loss = F.mse_loss(q_sa_sub, list_target[1])
                 t_s += 1
+                
+            # pass loss to network
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+            '''
+                
+    def Q_loss():
+        #actual_Q = ...
+        #predicted_Q = ...
+        #loss = 
+        pass
                 
     def eval(self):
         self.env.setup(deepcopy(self.test_g_list))
@@ -170,7 +182,9 @@ class Agent(object):
         pbar = tqdm(range(GLOBAL_NUM_STEPS), unit='steps')      # number of iterations to train?
         
         # set optimizer
-        optimizer = optim.Adam(self.net.parameters(), lr=cmd_args.learning_rate)
+        # optimizer = optim.Adam(self.net.parameters(), lr=cmd_args.learning_rate)
+        add_optimizer = optim.Adam(self.net.parameters(), lr=cmd_args.learning_rate)
+        sub_optimizer = optim.Adam(self.net.parameters(), lr=cmd_args.learning_rate)
         
         # for each iteration
         for self.step in pbar:
@@ -178,6 +192,8 @@ class Agent(object):
             # run simulation
             # side effects?
             self.run_simulation()
+            
+            exit()
 
             # save weights and evalute
             if self.step % 100 == 0:
@@ -241,11 +257,13 @@ class Agent(object):
 
 GLOBAL_PHASE = 'train'
 GLOBAL_NUM_STEPS = 1
+GLOBAL_EPISODE_STEPS = 50
+GLOBAL_NUM_GRAPHS = 20
 
 if __name__ == '__main__':
     
     # generate graphs
-    n_graphs = 5
+    n_graphs = GLOBAL_NUM_GRAPHS
     output = Generate_dataset(n_graphs)
     g_list, test_glist = load_graphs(output, n_graphs)
     

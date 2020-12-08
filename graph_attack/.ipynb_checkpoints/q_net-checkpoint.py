@@ -23,7 +23,7 @@ from cmd_args import cmd_args
 from rl_common import local_args
 
 def greedy_actions(q_values, banned_list, _type):
-        
+    
     actions = []
     offset = 0
     banned_acts = []
@@ -40,8 +40,19 @@ def greedy_actions(q_values, banned_list, _type):
     #
     #
     
+    #if len(banned_list) > 1:
+        #print(q_list[0].numpy(), q_list[0].numpy().shape)
+        #print(banned_list[0], banned_list[0].shape)
+        #print(q_list[0].numpy().T + banned_list[0], (q_list[0].numpy().T + banned_list[0]).shape)
+        #print(np.argmax(q_list[0].numpy().T + banned_list[0]))
+        #print("\n\n")
+        
+    actions = []
+    
+    for i in range(len(q_list)):
+        actions.append(np.argmax(q_list[i].numpy().T + banned_list[i]))
+        
     actions = [torch.argmax(q_val, dim=0) for q_val in q_list]
-
     
     return actions, q_list
     
@@ -100,44 +111,30 @@ class QNet(nn.Module):
 
         return node_feat_list
 
-    def add_offset(self, actions, v_p):
-        prefix_sum = v_p.data.cpu().numpy()
-
-        shifted = []        
-        for i in range(len(prefix_sum)):
-            if i > 0:
-                offset = prefix_sum[i - 1]
-            else:
-                offset = 0
-            shifted.append(actions[i] + offset)
-
-        return shifted
-
-    def rep_global_embed(self, graph_embed, prefix_sum):
-        rep_idx = []        
-        for i in range(len(prefix_sum)):
-            if i == 0:
-                n_nodes = prefix_sum[i]
-            else:
-                n_nodes = prefix_sum[i] - prefix_sum[i - 1]
-            rep_idx += [i] * n_nodes
-
-        rep_idx = Variable(torch.LongTensor(rep_idx))
-        if cmd_args.ctx == 'gpu':
-            rep_idx = rep_idx.cuda()
-        graph_embed = torch.index_select(graph_embed, 0, rep_idx)
-        return graph_embed
-
     # type = 0 for add, 1 for subtract
     def forward(self, states, actions, greedy_acts = False, _type=0):
         
         batch_graph, picked_nodes, banned_list = zip(*states)
         
-        print(picked_nodes)
-        
+        banned_list = []
 
-        node_feat = self.PrepareFeatures(batch_graph, picked_nodes)
+        for g_ind in range(len(batch_graph)):
+            g_netx = batch_graph[g_ind].to_networkx()
+            mask = np.zeros(len(g_netx.nodes))
+
+            if(picked_nodes[g_ind] is not None):
+                
+                banned_idxs = []
+                
+                for _node in range(20):
+                    if g_netx.has_edge(_node, picked_nodes[g_ind]):
+                        banned_idxs.append(_node)
+                
+                mask[banned_idxs] = -100
+                
+            banned_list.append(mask)
         
+        node_feat = self.PrepareFeatures(batch_graph, picked_nodes)
         
         if cmd_args.ctx == 'gpu':
             node_feat = node_feat.cuda()
@@ -159,31 +156,13 @@ class QNet(nn.Module):
         if _type:
             embed_s_a = F.relu( self.sub_linear_1(embed_s_a) )
             raw_pred = self.sub_linear_out(embed_s_a)
+            print("using Sub network")
         else:
             embed_s_a = F.relu( self.add_linear_1(embed_s_a) )
             raw_pred = self.add_linear_out(embed_s_a)
+            print("using Add network")
                     
         if greedy_acts:
             actions, raw_pred = greedy_actions(raw_pred, banned_list, _type=_type)
             
         return actions, raw_pred
-
-"""
-class NStepQNet(nn.Module):
-    def __init__(self, num_steps, s2v_module = None):
-        super(NStepQNet, self).__init__()
-
-        list_mod = [QNet(s2v_module)]
-
-        for i in range(1, num_steps):
-            list_mod.append(QNet(list_mod[0].s2v))
-        
-        self.list_mod = nn.ModuleList(list_mod)
-
-        self.num_steps = num_steps
-
-    def forward(self, time_t, states, actions, greedy_acts = False):
-        assert time_t >= 0 and time_t < self.num_steps
-
-        return self.list_mod[time_t](time_t, states, actions, greedy_acts)
-"""
