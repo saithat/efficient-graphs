@@ -32,6 +32,9 @@ from graph_common import loop_dataset
 
 from message import Generate_dataset
 
+import matplotlib.pyplot as plt
+from graph_embedding import S2VGraph
+
 class Agent(object):
     def __init__(self, g_list, test_g_list, env):
         self.g_list = g_list
@@ -55,7 +58,7 @@ class Agent(object):
         self.eps_start = 1.0
         self.eps_end = 1.0
         self.eps_step = 10000
-        self.burn_in = 100              # number of iterations to run first set ("intial burning in to memory") of simulations?
+        self.burn_in = 100
         self.step = 0
 
         self.best_eval = None
@@ -71,13 +74,12 @@ class Agent(object):
     def make_actions(self, greedy=True, _type = 0):
         self.eps = self.eps_end + max(0., (self.eps_start - self.eps_end)
                 * (self.eps_step - max(0., self.step)) / self.eps_step)
+        
+        
 
         cur_state = self.env.getStateRef()
 
         actions, q_arrs = self.net(cur_state, None, greedy_acts=True, _type=_type)
-
-        actions = torch.cat(actions)
-        actions = actions.numpy().tolist()
 
         q_vals = []
 
@@ -88,10 +90,10 @@ class Agent(object):
                         
         return actions, q_vals
 
-
     def run_simulation(self):
 
         self.env.setup(g_list)
+        avg_rewards = []
 
         t_a, t_s = 0, 0
         
@@ -100,11 +102,27 @@ class Agent(object):
             
             if asdf % 2 == 0:
                 assert self.env.first_nodes == None
+
+
+            for i in range(len(self.g_list)):
+            
+                g = self.g_list[i].to_networkx()
+
+                con_nodes = list(set(list(sum(g.edges, ()))))
+                for j in range(20):
+                    if (j not in con_nodes):
+                        rand_num = np.random.randint(0, 20)
+                        g.add_edge(j, rand_num)
+                        self.env.added_edges.append((j, rand_num))
+            
+                self.g_list[i] = S2VGraph(g, label = self.g_list[i].label)
             
             action_type = (asdf % 4) // 2
                 
             # get Actions
             list_at, _ = self.make_actions(_type=action_type)
+            #list_at, _ = self.random_actions(_type=action_type)
+                        
                    
             # save State
             list_st = self.env.cloneState()
@@ -116,6 +134,7 @@ class Agent(object):
             # get Rewards
             if self.env.first_nodes is not None:
                 rewards = self.env.get_rewards(list_at, _type=action_type)
+                avg_rewards.append(sum(rewards)/len(rewards))
             else:
                 rewards = [0] * len(g_list)
             
@@ -136,33 +155,15 @@ class Agent(object):
                 continue
             
             actual_Q = torch.Tensor(rewards) + torch.Tensor(q_primes)
-            
-            print("\n\nActions:", list_at)
-            
-            print("\n\nRewards:", rewards)
-            print("\n\nQ_prime:", q_primes)
-            
-            print("\n\nQ_vals:", predicted_Q.shape)
-            
-            
-            
-            
-            trailing = 20 * (predicted_Q.shape[0] // 20)
-            
-            #reshaped_Q = Variable(predicted_Q.view(int(trailing / 20), 20))
-            #reshaped_Q = torch.argmax(reshaped_Q, axis=1)
-            
-            print("\n\nQ_vals:", predicted_Q.shape)
-            
-            #predicted_Q = torch.chunk(predicted_Q[:num_chunks * 20], num_chunks, dim=0)
-            #torch.
-            
+
             loss = F.mse_loss(predicted_Q, actual_Q)
             
             # pass loss to network
             self.optimizer.zero_grad()
             loss.backward()
             self.optimizer.step()
+        
+        return avg_rewards
                 
     def eval(self):
         self.env.setup(deepcopy(self.test_g_list))
@@ -192,20 +193,27 @@ class Agent(object):
         
         # set up progress bar
         pbar = tqdm(range(GLOBAL_NUM_STEPS), unit='steps')
+        avgs = []
         
         # for each iteration
         for self.step in pbar:
             
-            
-
             # run simulation
-            self.run_simulation()
-            
-            exit()
+            avgs += self.run_simulation()
+
+        print("avgs: ",avgs)
+        mov_avg = np.convolve(np.array(avgs), np.ones(4), 'valid') / 4
+        print("mov avg: ", list(mov_avg))
+        print(type(mov_avg))
+        print(mov_avg.shape)
+        plt.clf()
+        plt.plot(list(mov_avg))
+        plt.title('running average of average rewards')
+        plt.show()          
 
 GLOBAL_PHASE = 'train'
-GLOBAL_NUM_STEPS = 1
-GLOBAL_EPISODE_STEPS = 500
+GLOBAL_NUM_STEPS = 100
+GLOBAL_EPISODE_STEPS = 50
 GLOBAL_NUM_GRAPHS = 10
 
 if __name__ == '__main__':
@@ -234,6 +242,7 @@ if __name__ == '__main__':
         print("\n\nStarting Training Loop\n\n")
         
         agent.train()
+
         
     else:
         print("\n\nStarting Evaluation Loop\n\n")
