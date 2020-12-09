@@ -227,7 +227,7 @@ class Agent(object):
         plt.show()          
 
 GLOBAL_PHASE = 'train'
-GLOBAL_NUM_STEPS = 100
+GLOBAL_NUM_STEPS = 50
 GLOBAL_EPISODE_STEPS = 50
 GLOBAL_NUM_GRAPHS = 10
 
