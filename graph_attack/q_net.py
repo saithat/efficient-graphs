@@ -61,9 +61,13 @@ class QNet(nn.Module):
         
         #if local_args.mlp_hidden:
         self.add_linear_1 = nn.Linear(embed_dim, local_args.mlp_hidden)
+        #self.add_linear_2 = nn.Linear(local_args.mlp_hidden, local_args.mlp_hidden*2)
+        #self.add_linear_3 = nn.Linear(local_args.mlp_hidden*2, local_args.mlp_hidden)
         self.add_linear_out = nn.Linear(local_args.mlp_hidden, 1)
         
         self.sub_linear_1 = nn.Linear(embed_dim, local_args.mlp_hidden)
+        #self.sub_linear_2 = nn.Linear(local_args.mlp_hidden, local_args.mlp_hidden*2)
+        #self.sub_linear_3 = nn.Linear(local_args.mlp_hidden*2, local_args.mlp_hidden)
         self.sub_linear_out = nn.Linear(local_args.mlp_hidden, 1)
                 
         weights_init(self)
