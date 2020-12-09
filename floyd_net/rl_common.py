@@ -30,10 +30,9 @@ from dnn import GraphClassifier
 from message import get_y_add, get_y_sub
 
 sys.path.append('%s/../data_generator' % os.path.dirname(os.path.realpath(__file__)))
-from data_util import load_pkl
 
 sys.path.append('%s/../graph_classification' % os.path.dirname(os.path.realpath(__file__)))
-from graph_common import loop_dataset
+#from graph_common import loop_dataset
 
 GLOBAL_PREFIX = 20
 
@@ -96,7 +95,6 @@ class GraphEdgeEnv(object):
                 Y = get_y_sub(g, self.first_nodes[i])
             else:
                 Y = get_y_add(g, self.first_nodes[i])
-            
             
             R = Y[actions[i]]
             
@@ -172,27 +170,7 @@ class GraphEdgeEnv(object):
     #        act_list.append(np.random.randint(GLOBAL_PREFIX))
     #    return act_list
 
-    def sampleActions(self, probs, greedy=False):
-        offset = 0
-        act_list = []
-        for i in range(len(self.prefix_sum)):
-            p_vec = probs[offset : self.prefix_sum[i], 0].astype(np.float64)
 
-            if self.first_nodes is not None:
-                banned_actions = self.banned_list[i]
-                for j in banned_actions:
-                    p_vec[j] = 0.0
-                assert len(banned_actions) < len(p_vec)
-
-            p_vec = p_vec / sum(p_vec)
-            if greedy:
-                action = np.argmax(p_vec)
-            else:
-                action = np.argmax(np.random.multinomial(1, p_vec))
-            act_list.append(action)
-            offset = self.prefix_sum[i]
-
-        return act_list
 
     def isTerminal(self):
         return False
@@ -232,78 +210,3 @@ def load_graphs(graph_tuples, n_graphs, frac_train=None):
 
     return train_glist, test_glist
 
-def test_graphs(classifier, test_glist):
-    test_loss = loop_dataset(test_glist, classifier, list(range(len(test_glist))))
-    print('\033[93maverage test: loss %.5f acc %.5f\033[0m' % (test_loss[0], test_loss[1]))
-
-def load_base_model(label_map, test_glist = None):
-    assert cmd_args.base_model_dump is not None
-    with open('%s-args.pkl' % cmd_args.base_model_dump, 'rb') as f:
-        base_args = cp.load(f)
-
-    classifier = GraphClassifier(label_map, **vars(base_args))
-    if cmd_args.ctx == 'gpu':
-        classifier = classifier.cuda()
-
-    classifier.load_state_dict(torch.load(cmd_args.base_model_dump + '.model'))
-    if test_glist is not None:
-        test_graphs(classifier, test_glist)
-
-    return classifier
-"""
-def attackable(classifier, s2v_g, x = None, y = None):
-    g = s2v_g.to_networkx()
-    comps = [c for c in nx.connected_component_subgraphs(g)]
-    set_id = {}
-
-    for i in range(len(comps)):
-        for j in comps[i].nodes():
-            set_id[j] = i
-    
-    if x is not None:
-        r_i = [x]
-    else:
-        r_i = range(len(g) - 1)
-
-    g_list = []    
-    for i in r_i:
-        if y is not None:
-            assert x is not None
-            r_j = [y]
-        else:
-            if x is not None:
-                r_j = range(len(g) - 1)
-            else:
-                r_j = range(i + 1, len(g))
-        for j in r_j:
-            if set_id[i] != set_id[j]:
-                continue
-            g2 = g.copy()
-            g2.add_edge(i, j)
-            assert nx.number_connected_components(g2) == s2v_g.label
-            g_list.append(S2VGraph(g2, s2v_g.label))
-    if len(g_list) == 0:
-        print(x, y)
-        print(g.edges(), s2v_g.label)
-        print(set_id)
-    assert len(g_list)
-    _, _, acc = classifier(g_list)
-
-    return np.sum(acc.view(-1).numpy()) < len(g_list)
-
-def get_supervision(classifier, list_st, list_at):
-    list_target = torch.zeros(len(list_st))
-    for i in range(len(list_st)):
-        g, x, _ = list_st[i]
-        if x is not None:
-            att = attackable(classifier, g, x, list_at[i])
-        else:
-            att = attackable(classifier, g, list_at[i])
-
-        if att:
-            list_target[i] = 1.0
-        else:
-            list_target[i] = -1.0
-    
-    return list_target
-"""

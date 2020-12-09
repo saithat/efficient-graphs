@@ -61,13 +61,9 @@ class QNet(nn.Module):
         
         #if local_args.mlp_hidden:
         self.add_linear_1 = nn.Linear(embed_dim, local_args.mlp_hidden)
-        #self.add_linear_2 = nn.Linear(local_args.mlp_hidden, local_args.mlp_hidden*2)
-        #self.add_linear_3 = nn.Linear(local_args.mlp_hidden*2, local_args.mlp_hidden)
         self.add_linear_out = nn.Linear(local_args.mlp_hidden, 1)
         
         self.sub_linear_1 = nn.Linear(embed_dim, local_args.mlp_hidden)
-        #self.sub_linear_2 = nn.Linear(local_args.mlp_hidden, local_args.mlp_hidden*2)
-        #self.sub_linear_3 = nn.Linear(local_args.mlp_hidden*2, local_args.mlp_hidden)
         self.sub_linear_out = nn.Linear(local_args.mlp_hidden, 1)
                 
         weights_init(self)
@@ -151,20 +147,16 @@ class QNet(nn.Module):
         graph_embed = []
         
         for i in range(len(batch_graph)):
-
+            #print(batch_graph[i].to_networkx().edges)
             tmp_embed, tmp_graph_embed = self.s2v([batch_graph[i]], node_feat[i], None, pool_global=True)
             
             embed.append(tmp_embed)
             graph_embed.append(tmp_graph_embed)
         
-        #embed = torch.cat(embed)
-        #graph_embed = torch.cat(graph_embed)
+        embed = torch.cat(embed)
+        graph_embed = torch.cat(graph_embed)
 
-        #print(embed.shape)
-        #print(graph_embed.shape)
-        
-        #embed_s_a = torch.cat((embed, graph_embed), dim=0)
-        embed_s_a = torch.cat(embed, dim=0)
+        embed_s_a = torch.cat((embed, graph_embed), dim=0)
 
         if _type:
             embed_s_a = F.relu( self.sub_linear_1(embed_s_a) )

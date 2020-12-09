@@ -19,16 +19,13 @@ sys.path.append('%s/../common' % os.path.dirname(os.path.realpath(__file__)))
 from cmd_args import cmd_args
 
 import warnings
-#warnings.filterwarnings("ignore")
+warnings.filterwarnings("ignore")
 
-from rl_common import GraphEdgeEnv, local_args, load_graphs, test_graphs, load_base_model
-from nstep_replay_mem import NstepReplayMem
+from rl_common import GraphEdgeEnv, local_args, load_graphs
 
 sys.path.append('%s/../graph_classification' % os.path.dirname(os.path.realpath(__file__)))
 
 from dnn import GraphClassifier
-
-from graph_common import loop_dataset
 
 from message import Generate_dataset
 
@@ -43,8 +40,6 @@ class Agent(object):
         else:
             self.test_g_list = test_g_list
             
-        self.add_mem_pool = NstepReplayMem(memory_size=50000, n_steps=2)
-        self.sub_mem_pool = NstepReplayMem(memory_size=50000, n_steps=2)
         self.env = env
         self.net = QNet()
         self.old_net = QNet()
@@ -79,10 +74,6 @@ class Agent(object):
 
         actions, q_arrs = self.net(cur_state, None, greedy_acts=True, _type=_type)
 
-        #actions = torch.cat(actions)
-        #actions = actions.numpy().tolist()
-        #actions = actions.tolist()
-
         q_vals = []
 
         for i in range(len(q_arrs)):
@@ -99,12 +90,10 @@ class Agent(object):
 
         t_a, t_s = 0, 0
         
-        #while not env.isTerminal():
         for asdf in range(GLOBAL_EPISODE_STEPS):
             
             if asdf % 2 == 0:
                 assert self.env.first_nodes == None
-
 
             for i in range(len(self.g_list)):
             
@@ -123,9 +112,7 @@ class Agent(object):
                 
             # get Actions
             list_at, _ = self.make_actions(_type=action_type)
-            #list_at, _ = self.random_actions(_type=action_type)
-                        
-                   
+            
             # save State
             list_st = self.env.cloneState()
             
@@ -149,59 +136,23 @@ class Agent(object):
             else:
                 s_prime = self.env.cloneState()
             
-            # get Q(S', A) values
+            # get S'and A' values
             try:
                 sprime_at, q_primes = self.make_actions(_type=action_type)
             
             except:
                 continue
             
+            # Calculate Q(S', A')
             actual_Q = torch.Tensor(rewards) + torch.Tensor(q_primes)
             
-            print("\n\nQ_vals:", predicted_Q.shape)
-            
-            trailing = 20 * (predicted_Q.shape[0] // 20)
-            
-            #reshaped_Q = Variable(predicted_Q.view(int(trailing / 20), 20))
-            #reshaped_Q = torch.argmax(reshaped_Q, axis=1)
-            
-            print("\n\nQ_vals:", predicted_Q.shape)
-            
-            #predicted_Q = torch.chunk(predicted_Q[:num_chunks * 20], num_chunks, dim=0)
-            #torch.
-            
+            # Pass loss to network
             loss = F.mse_loss(predicted_Q, actual_Q)
-            
-            # pass loss to network
             self.optimizer.zero_grad()
             loss.backward()
             self.optimizer.step()
-        
+                    
         return avg_rewards
-                
-    def eval(self):
-        self.env.setup(deepcopy(self.test_g_list))
-        t = 0
-        
-        while not self.env.isTerminal():
-            list_at = self.make_actions(greedy=True, _type=(t % 4) // 2)
-            self.env.step(list_at)
-            t += 1
-            
-        test_loss = loop_dataset(env.g_list, env.classifier, list(range(len(env.g_list))))
-        
-        print('\033[93m average test: loss %.5f acc %.5f\033[0m' % (test_loss[0], test_loss[1]))
-
-        if cmd_args.phase == 'train' and self.best_eval is None or test_loss[1] < self.best_eval:
-            print('----saving to best attacker since this is the best attack rate so far.----')
-            torch.save(self.net.state_dict(), cmd_args.save_dir + '/epoch-best.model')
-            with open(cmd_args.save_dir + '/epoch-best.txt', 'w') as f:
-                f.write('%.4f\n' % test_loss[1])
-            self.best_eval = test_loss[1]
-
-        reward = np.mean(self.env.rewards)
-        print(reward)
-        return reward, test_loss[1]
 
     def train(self):
         
@@ -226,12 +177,15 @@ class Agent(object):
         plt.clf()
         plt.plot(list(mov_avg))
         plt.title('running average of average rewards')
-        plt.show()          
+        
+        plt.savefig("Results.png")
+        
+        plt.show()
 
 GLOBAL_PHASE = 'train'
-GLOBAL_NUM_STEPS = 50
+GLOBAL_NUM_STEPS = 12
 GLOBAL_EPISODE_STEPS = 50
-GLOBAL_NUM_GRAPHS = 10
+GLOBAL_NUM_GRAPHS = 20
 
 if __name__ == '__main__':
     
