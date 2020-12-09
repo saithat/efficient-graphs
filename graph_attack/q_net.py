@@ -151,16 +151,20 @@ class QNet(nn.Module):
         graph_embed = []
         
         for i in range(len(batch_graph)):
-            #print(batch_graph[i].to_networkx().edges)
+
             tmp_embed, tmp_graph_embed = self.s2v([batch_graph[i]], node_feat[i], None, pool_global=True)
             
             embed.append(tmp_embed)
             graph_embed.append(tmp_graph_embed)
         
-        embed = torch.cat(embed)
-        graph_embed = torch.cat(graph_embed)
+        #embed = torch.cat(embed)
+        #graph_embed = torch.cat(graph_embed)
 
-        embed_s_a = torch.cat((embed, graph_embed), dim=0)
+        #print(embed.shape)
+        #print(graph_embed.shape)
+        
+        #embed_s_a = torch.cat((embed, graph_embed), dim=0)
+        embed_s_a = torch.cat(embed, dim=0)
 
         if _type:
             embed_s_a = F.relu( self.sub_linear_1(embed_s_a) )

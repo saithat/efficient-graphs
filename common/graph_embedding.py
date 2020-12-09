@@ -93,6 +93,7 @@ class EmbedMeanField(nn.Module):
         e2n_sp = Variable(e2n_sp, requires_grad=e2n_grad)
         subg_sp = Variable(subg_sp)
 
+        
         h = self.mean_field(node_feat, edge_feat, n2n_sp, e2n_sp, subg_sp, pool_global)
 
         if n2n_grad or e2n_grad:

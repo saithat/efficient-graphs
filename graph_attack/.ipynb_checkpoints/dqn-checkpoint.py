@@ -19,7 +19,7 @@ sys.path.append('%s/../common' % os.path.dirname(os.path.realpath(__file__)))
 from cmd_args import cmd_args
 
 import warnings
-warnings.filterwarnings("ignore")
+#warnings.filterwarnings("ignore")
 
 from rl_common import GraphEdgeEnv, local_args, load_graphs, test_graphs, load_base_model
 from nstep_replay_mem import NstepReplayMem
@@ -89,7 +89,7 @@ class Agent(object):
             q_vals.append(tmp)
                         
         return actions, q_vals
-    
+
     def run_simulation(self):
 
         self.env.setup(g_list)
