@@ -58,7 +58,7 @@ class Agent(object):
         self.eps_start = 1.0
         self.eps_end = 1.0
         self.eps_step = 10000
-        self.burn_in = 100              # number of iterations to run first set ("intial burning in to memory") of simulations?
+        self.burn_in = 100
         self.step = 0
 
         self.best_eval = None
@@ -74,14 +74,12 @@ class Agent(object):
     def make_actions(self, greedy=True, _type = 0):
         self.eps = self.eps_end + max(0., (self.eps_start - self.eps_end)
                 * (self.eps_step - max(0., self.step)) / self.eps_step)
+        
+        
 
         cur_state = self.env.getStateRef()
 
         actions, q_arrs = self.net(cur_state, None, greedy_acts=True, _type=_type)
-
-        #actions = torch.cat(actions)
-        #actions = actions.numpy().tolist()
-        #actions = actions.tolist()
 
         q_vals = []
 
@@ -92,10 +90,6 @@ class Agent(object):
                         
         return actions, q_vals
     
-    #def random_actions(self, _type=0):
-    #    actions = self.env.really_random()
-    #    return actions
-
     def run_simulation(self):
 
         self.env.setup(g_list)
@@ -161,13 +155,7 @@ class Agent(object):
                 continue
             
             actual_Q = torch.Tensor(rewards) + torch.Tensor(q_primes)
-            
-            #print("\n\nActions:", list_at)
-            #print("\n\nQ_vals:", predicted_Q.shape)
-            #print("\n\nRewards:", rewards)
-            #print('avg: ', sum(rewards)/len(rewards))
-            #print("\n\nQ_prime:", q_primes)
-            
+
             loss = F.mse_loss(predicted_Q, actual_Q)
             
             # pass loss to network
@@ -206,16 +194,13 @@ class Agent(object):
         # set up progress bar
         pbar = tqdm(range(GLOBAL_NUM_STEPS), unit='steps')
         avgs = []
+        
         # for each iteration
         for self.step in pbar:
+            
             # run simulation
-            # side effects?
             avgs += self.run_simulation()
-            #print("tmp: ", tmp)
-            #avg_reward_step.append(sum(tmp)/len(tmp))
-            #plt.plot(tmp)
-            #plt.show()
-            #plt.savefig('test.png')
+
         print("avgs: ",avgs)
         mov_avg = np.convolve(np.array(avgs), np.ones(4), 'valid') / 4
         print("mov avg: ", list(mov_avg))
