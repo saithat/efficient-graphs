@@ -29,9 +29,9 @@ from dnn import GraphClassifier
 
 from message import get_y_add, get_y_sub
 
-sys.path.append('%s/../data_generator' % os.path.dirname(os.path.realpath(__file__)))
+#sys.path.append('%s/../data_generator' % os.path.dirname(os.path.realpath(__file__)))
 
-sys.path.append('%s/../graph_classification' % os.path.dirname(os.path.realpath(__file__)))
+#sys.path.append('%s/../graph_classification' % os.path.dirname(os.path.realpath(__file__)))
 #from graph_common import loop_dataset
 
 GLOBAL_PREFIX = 20
