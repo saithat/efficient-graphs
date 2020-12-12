@@ -23,7 +23,7 @@ warnings.filterwarnings("ignore")
 
 from rl_common import GraphEdgeEnv, local_args, load_graphs
 
-sys.path.append('%s/../graph_classification' % os.path.dirname(os.path.realpath(__file__)))
+#sys.path.append('%s/../graph_classification' % os.path.dirname(os.path.realpath(__file__)))
 
 from dnn import GraphClassifier
 
