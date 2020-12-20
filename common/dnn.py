@@ -60,7 +60,7 @@ class MLPClassifier(nn.Module):
             x = F.relu(x)
         
         logits = self.last_weights(x)
-        logits = F.log_softmax(logits, dim=1)        
+        logits = F.log_softmax(logits, dim=1)
 
         if y is not None:
             y = Variable(y)

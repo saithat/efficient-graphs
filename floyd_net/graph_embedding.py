@@ -86,12 +86,17 @@ class EmbedMeanField(nn.Module):
             n2n_sp = n2n_sp.cuda()
             e2n_sp = e2n_sp.cuda()
             subg_sp = subg_sp.cuda()
+        #print(node_feat)
+        #print(type(node_feat))
         node_feat = Variable(node_feat)
         if edge_feat is not None:
             edge_feat = Variable(edge_feat)
         n2n_sp = Variable(n2n_sp, requires_grad=n2n_grad)
         e2n_sp = Variable(e2n_sp, requires_grad=e2n_grad)
         subg_sp = Variable(subg_sp)
+
+        #print("graph_list shape: ", len(graph_list))
+        #print("node feat shape: ", node_feat.shape)
 
         h = self.mean_field(node_feat, edge_feat, n2n_sp, e2n_sp, subg_sp, pool_global)
 
@@ -112,6 +117,8 @@ class EmbedMeanField(nn.Module):
 
         lv = 0
         cur_message_layer = input_potential
+        #print("n2n sp shape: ",n2n_sp.shape)
+        #print("cur message layer shape: ",cur_message_layer.shape)
         while lv < self.max_lv:
             n2npool = gnn_spmm(n2n_sp, cur_message_layer)
             node_linear = self.conv_params( n2npool )

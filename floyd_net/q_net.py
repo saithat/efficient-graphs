@@ -60,10 +60,10 @@ class QNet(nn.Module):
             embed_dim = cmd_args.out_dim
         
         #if local_args.mlp_hidden:
-        self.add_linear_1 = nn.Linear(embed_dim, local_args.mlp_hidden)
+        self.add_linear_1 = nn.Linear(embed_dim*2, local_args.mlp_hidden)
         self.add_linear_out = nn.Linear(local_args.mlp_hidden, 1)
         
-        self.sub_linear_1 = nn.Linear(embed_dim, local_args.mlp_hidden)
+        self.sub_linear_1 = nn.Linear(embed_dim*2, local_args.mlp_hidden)
         self.sub_linear_out = nn.Linear(local_args.mlp_hidden, 1)
                 
         weights_init(self)
@@ -80,23 +80,66 @@ class QNet(nn.Module):
     # batch_graph is the graph, picked_nodes is the edge stub
     def PrepareFeatures(self, batch_graph, picked_nodes):
         
-        n_nodes = batch_graph[0].num_nodes
+        #n_nodes = batch_graph[0].num_nodes
+        n_nodes = 0
+        #print(n_nodes)
         node_feat_list = []
+        prefix_sum = []
+        picked_ones = []
         
         for i in range(len(batch_graph)):
             if picked_nodes is not None and picked_nodes[i] is not None:
                 assert picked_nodes[i] >= 0 and picked_nodes[i] < batch_graph[i].num_nodes
+                picked_ones.append(n_nodes + picked_nodes[i])
+            n_nodes += batch_graph[i].num_nodes
+            prefix_sum.append(n_nodes)
 
-            node_feat = torch.zeros(n_nodes, 2)
-            node_feat[:, 0] = 1.0
+            #node_feat = torch.zeros(n_nodes, 2)
+            #node_feat[:, 0] = 1.0
 
-            if len(picked_nodes) >= i:
-                node_feat.numpy()[picked_nodes[i], 1] = 1.0
-                node_feat.numpy()[picked_nodes[i], 0] = 0.0
+            #if len(picked_nodes) >= i:
+            #    node_feat.numpy()[picked_nodes[i], 1] = 1.0
+            #    node_feat.numpy()[picked_nodes[i], 0] = 0.0
                 
-            node_feat_list.append(node_feat)
+            #node_feat_list.append(node_feat)
+        node_feat = torch.zeros(n_nodes, 2)
+        node_feat[:, 0] = 1.0
 
-        return node_feat_list
+        if len(picked_ones):
+            node_feat.numpy()[picked_ones, 1] = 1.0
+            node_feat.numpy()[picked_ones, 0] = 0.0
+
+        return node_feat, torch.LongTensor(prefix_sum)
+
+    def add_offset(self, actions, v_p):
+        prefix_sum = v_p.data.cpu().numpy()
+
+        shifted = []        
+        for i in range(len(prefix_sum)):
+            if i > 0:
+                offset = prefix_sum[i - 1]
+            else:
+                offset = 0
+            shifted.append(actions[i] + offset)
+
+        return shifted
+
+    def rep_global_embed(self, graph_embed, v_p):
+        prefix_sum = v_p.data.cpu().numpy()
+
+        rep_idx = []        
+        for i in range(len(prefix_sum)):
+            if i == 0:
+                n_nodes = prefix_sum[i]
+            else:
+                n_nodes = prefix_sum[i] - prefix_sum[i - 1]
+            rep_idx += [i] * n_nodes
+
+        rep_idx = Variable(torch.LongTensor(rep_idx))
+        if cmd_args.ctx == 'gpu':
+            rep_idx = rep_idx.cuda()
+        graph_embed = torch.index_select(graph_embed, 0, rep_idx)
+        return graph_embed
 
     # type = 0 for add, 1 for subtract
     def forward(self, states, actions=None, greedy_acts = False, _type=0):
@@ -138,25 +181,42 @@ class QNet(nn.Module):
             
         # ------------------------------------------------
         
-        node_feat = self.PrepareFeatures(batch_graph, picked_nodes)
+        node_feat, prefix_sum = self.PrepareFeatures(batch_graph, picked_nodes)
         
         if cmd_args.ctx == 'gpu':
             node_feat = node_feat.cuda()
- 
-        embed = []
-        graph_embed = []
-        
-        for i in range(len(batch_graph)):
-            #print(batch_graph[i].to_networkx().edges)
-            tmp_embed, tmp_graph_embed = self.s2v([batch_graph[i]], node_feat[i], None, pool_global=True)
-            
-            embed.append(tmp_embed)
-            graph_embed.append(tmp_graph_embed)
-        
-        embed = torch.cat(embed)
-        graph_embed = torch.cat(graph_embed)
+        prefix_sum = Variable(prefix_sum)
 
-        embed_s_a = torch.cat((embed, graph_embed), dim=0)
+        embed, graph_embed = self.s2v(batch_graph, node_feat, None, pool_global=True)
+
+        if actions is None:
+            graph_embed = self.rep_global_embed(graph_embed, prefix_sum)
+        else:
+            shifted = self.add_offset(actions, prefix_sum)
+            embed = embed[shifted, :]
+ 
+        #embed = []
+        #graph_embed = []
+        
+        #for i in range(len(batch_graph)):
+            #print(batch_graph[i].to_networkx().edges)
+        #    tmp_embed, tmp_graph_embed = self.s2v([batch_graph[i]], node_feat[i], None, pool_global=True)
+        #    
+        #    embed.append(tmp_embed)
+        #    graph_embed.append(tmp_graph_embed)
+        
+        #embed = torch.cat(embed)
+        #graph_embed = torch.cat(graph_embed)
+
+        #embed_s_a = torch.cat((embed, graph_embed), dim=0)
+        #print("embed shape: ", embed.shape)
+        #print("tmp_embed shape: ", tmp_embed.shape)
+        #print("graph embed shape: ",graph_embed.shape)
+        #print("tmp graph embed shape: ",tmp_graph_embed.shape)
+        #embed_s_a = torch.cat((tmp_embed, tmp_graph_embed), dim=0)
+        embed_s_a = torch.cat((embed, graph_embed), dim=1)
+
+
 
         if _type:
             embed_s_a = F.relu( self.sub_linear_1(embed_s_a) )

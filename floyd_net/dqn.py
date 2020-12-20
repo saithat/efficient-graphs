@@ -117,6 +117,9 @@ class Agent(object):
             list_st = self.env.cloneState()
             
             cur_state = self.env.getStateRef()
+
+            #print('original length of g_list: ', len(g_list))
+            #print('original length of g_list (self): ', len(self.g_list))
             
             _, predicted_Q = self.net(cur_state, None, greedy_acts=False, _type=action_type)
                         
@@ -169,21 +172,24 @@ class Agent(object):
             #plt.plot(tmp)
             #plt.show()
             #plt.savefig('test.png')
+        #avgs = [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
         print("avgs: ",avgs)
         mov_avg = np.convolve(np.array(avgs), np.ones(4), 'valid') / 4
         print("mov avg: ", list(mov_avg))
         print(type(mov_avg))
         print(mov_avg.shape)
         plt.clf()
-        plt.plot(list(mov_avg))
-        plt.title('running average of average rewards')
+        fig, (ax1, ax2) = plt.subplots(1, 2)
+        fig.suptitle('avg and running average of average rewards')
+        ax1.plot(avgs)
+        ax2.plot(list(mov_avg))
         
         plt.savefig("Results.png")
         
         plt.show()
 
 GLOBAL_PHASE = 'train'
-GLOBAL_NUM_STEPS = 12
+GLOBAL_NUM_STEPS = 500
 GLOBAL_EPISODE_STEPS = 50
 GLOBAL_NUM_GRAPHS = 20
 

@@ -114,6 +114,7 @@ class GraphEdgeEnv(object):
             self.first_nodes = actions
             self.banned_list = []
             
+            #print("g list shape: ", len(self.g_list))
             for i in range(len(self.g_list)):
                 self.banned_list.append(self.bannedActions(self.g_list[i].to_networkx(), self.first_nodes[i])) 
         
